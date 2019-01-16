@@ -1,3 +1,17 @@
+/*
+ *
+ *  University di Pisa - Master's Degree in Computer Science and Networking
+ *
+ *  Final Project for the course of Peer to Peer Systems and Blockchains
+ *
+ *  Teacher: Prof. Laura Ricci
+ *
+ *  Candidate: Orlando Leombruni, matricola 475727
+ *
+ *  File: CreatorApp.js
+ *
+ */
+
 import React from 'react';
 import { withStyles } from '@material-ui/core';
 import PropTypes from 'prop-types';
@@ -33,12 +47,18 @@ import CopyToClipboard from 'react-copy-to-clipboard';
 import 'react-notifications-component/dist/theme.css';
 import 'animate.css';
 import json from '../solidity/compiled.json';
-import {makeTitle, prettifyWei} from "../Utils";
+import {getTransactionParameters, makeTitle, prettifyWei} from "../Utils";
 import { CreatorAppStyle as styles } from "../styles/MaterialCustomStyles";
 
+/*
+ * "Slide up" transition for the animation of a React component.
+ */
 const Transition = (props) =>
-    <Slide direction="up" {...props} />
+    <Slide direction="up" {...props} />;
 
+/*
+ * Enum-like object for the various sections of the application.
+ */
 const Panels = Object.freeze({
     LIST_CONTENT: Symbol("list"),
     NEW_CONTENT: Symbol("new"),
@@ -46,6 +66,12 @@ const Panels = Object.freeze({
     PUBLISH: Symbol("publish"),
 });
 
+/*
+ * CreatorApp Class
+ *
+ * A React Component that represents the entire Creators portion for the app.
+ * It allows a Creator to publish new contents, delete existing ones, and request monetization for their work.
+ */
 class CreatorApp extends React.Component {
 
     constructor(props) {
@@ -56,16 +82,6 @@ class CreatorApp extends React.Component {
         this.props.manageCenter(false);
         const abi = JSON.parse(json.contracts["Catalog.sol:Catalog"].abi);
         this.Catalog = new this.web3.eth.Contract(abi, this.props.catalog);
-        this.props.web3.eth.getGasPrice().then((result, error) => {
-            if (error) {
-                console.log("Could not get gas price from blockchain, faling back to " +
-                    "default value of 20 gwei " + error);
-                const price = new this.props.web3.utils.BN(this.props.web3.utils.toWei(20, "gwei"));
-                this.setState(oldState => ({...oldState, gasPrice: price.toString()}));
-            }
-            else this.setState(oldState => ({...oldState, gasPrice: result.toString()}));
-            console.log('gasprice is ' + this.state.gasPrice);
-        });
         this.newContent = {};
         this.registered = [];
     }
@@ -73,12 +89,10 @@ class CreatorApp extends React.Component {
     state = {
         panel: Panels.LIST_CONTENT,
         contentList: [],
-        gasPrice: "",
-        confirmTransition: false,
         transactionProps: {},
         transactPopup: false,
         error: false,
-        selContent: "",
+        selectedContent: "",
         creatingContent: false,
         publishingContent: false,
         closing: false,
@@ -88,10 +102,12 @@ class CreatorApp extends React.Component {
         monetize: false,
     };
 
+    // Changes the current panel (section of the app).
     changePanel = (panel) => () => {
         this.setState(oldState => ({...oldState, panel: panel}));
     };
 
+    // Displays a notification in the upper right portion of the screen.
     notify(title, message, type, time) {
         this.notificationRef.current.addNotification({
             title,
@@ -106,80 +122,59 @@ class CreatorApp extends React.Component {
         });
     }
 
+    // Callback function to handle user input for the publishing/deletion of a content.
     handleContent = (event) => {
         const { target } = event;
-        this.setState(oldState => ({...oldState, selContent: target.value}))
+        this.setState(oldState => ({...oldState, selectedContent: target.value}))
     };
 
+    // Closes the "new Content created" popup dialog.
+    handleDialog = () =>
+        this.setState(oldState => ({...oldState, createdPopup: false, createdContent: ""}));
+
+    /*
+     * Begins the deletion of a ContentManagementBase contract, checking the correctness of the operation
+     * (i.e. if the content exists and is owned by the current selected EOA) and estimating the gas cost.
+     */
     initiateDelete = () => {
-        let error = (this.state.selContent === "");
+        let error = (this.state.selectedContent === "");
         const abi = JSON.parse(json.contracts["ContentManagementBase.sol:ContentManagementBase"].abi);
         const CMB = new this.web3.eth.Contract(abi);
         try {
-            CMB.options.address = this.state.selContent;
-        } catch (e) {
+            CMB.options.address = this.state.selectedContent;
+        } catch (err) {
             error = true;
-            console.log(e);
+            console.log(err);
         }
         if (error) {
             this.setState(oldState => ({...oldState, error: true}));
             this.notify("Error", "Invalid Content address", "danger");
         } else {
             this.setState(oldState => ({...oldState, closing: true, error: false}));
-            this.web3.eth.getBalance(this.props.account).then(
-                (result) => {
-                    this.setState(oldState => ({
-                        ...oldState,
-                        transactionProps: {...oldState.transactionProps, balance: result.toString()},
-                        transactPopup: (oldState.transactionProps.gas && oldState.transactionProps.gasPrice)
-                    }));
-                },
+            getTransactionParameters(this.web3, CMB.methods.closeContract(), this.props.account).then(
+                (result) => this.setState(o => ({...o, transactionProps: result, transactPopup: true})),
                 (error) => {
+                    console.log("Error in getting parameters for initiateDelete");
                     console.log(error);
-                    console.log("could not get balance for current account: " + error);
-                    this.notify("Error", error.message.toString(), "danger");
-                }
-            );
-            CMB.methods.closeContract().estimateGas({from: this.props.account}).then(
-                (result) => {
-                    this.setState(oldState => ({
-                        ...oldState,
-                        transactionProps: {...oldState.transactionProps, gas: result.toString()},
-                        transactPopup: (oldState.transactionProps.balance && oldState.transactionProps.gasPrice)
-                    }));
-                },
-                (error) => {
-                    console.log(error);
-                    console.log("could not estimate gas: " + error);
-                    this.notify("Error", error.message.toString(), "danger");
-                }
-            );
-            this.web3.eth.getGasPrice().then(
-                (result) => {
-                    this.setState(oldState => ({
-                        ...oldState,
-                        transactionProps: {...oldState.transactionProps, gasPrice: result.toString()},
-                        transactPopup: (oldState.transactionProps.gas && oldState.transactionProps.balance)
-                    }));
-                },
-                (error) => {
-                    console.log("could not get balance for account: " + error);
-                    this.notify("Error", error.message.toString(), "danger");
+                    this.notify("Error", error.stackTrace.message.toString(), "danger");
                 }
             );
         }
     };
 
-    confirmClose = () => {
+    /*
+     * Invoked when the user confirms the transaction (after reviewing it in an informative dialog), this function
+     * effectively closes and deletes a content, checking afterwards that the operation was successful.
+     */
+    confirmDelete = () => {
         const abi = JSON.parse(json.contracts["ContentManagementBase.sol:ContentManagementBase"].abi);
-        const CMB = new this.web3.eth.Contract(abi, this.state.selContent);
+        const CMB = new this.web3.eth.Contract(abi, this.state.selectedContent);
         CMB.methods.closeContract().send({
             from: this.props.account,
             gasPrice: this.state.transactionProps.gasPrice,
             gas: this.state.transactionProps.gas,
         }).then(
             (result) => {
-                console.log(result);
                 CMB.methods.isActiveContent().call({from: this.props.account}).then(
                     () => this.notify("Error", "Contract NOT closed! Are you the owner?", "danger"),
                     () => this.notify("Success!", "Content contract was closed!", "success")
@@ -195,63 +190,37 @@ class CreatorApp extends React.Component {
         this.setState(oldState => ({...oldState, loading: true, closing: false, transactionProps: {}, transactPopup: false}));
     };
 
+    // Starts a request for monetization of a Content to the Catalog, estimating the gas cost.
     requestMonetization = (key) => () => {
         const address = this.state.contentList[key].address;
-        this.Catalog.methods.collectPayment(address).estimateGas({from: this.props.account}).then(
-            (result) => {
-                this.setState(oldState => ({
-                    ...oldState,
-                    transactionProps: {
-                        ...oldState.transactionProps,
-                        gas: result.toString()
-                    },
-                    transactPopup: (oldState.transactionProps.balance && oldState.transactionProps.gasPrice),
-                }))
-            },
+        getTransactionParameters(this.web3, this.Catalog.methods.collectPayment(address), this.props.account).then(
+            (result) => this.setState(o => ({...o, transactionProps: result, transactPopup: true})),
             (error) => {
-                this.notify("Error", "Could not request payment, maybe there's no payment available", "danger");
-                console.log("Could not estimate monetize gas");
-                this.setState(oldState => ({...oldState, transactionProps:{}, transactPopup: false, monetize: ""}))
-            }
-        );
-        this.web3.eth.getBalance(this.props.account).then(
-            (result) => {
-                this.setState(oldState => ({
-                    ...oldState, transactionProps: {
-                        ...oldState.transactionProps,
-                        balance: result.toString(),
-                    },
-                    transactPopup: (oldState.transactionProps.gas && oldState.transactionProps.gasPrice),
-                }));
-                console.log("got balance of " + result.toString());
-            },
-            (error) => {
-                console.log("could not get balance for account");
-                this.notify("Error", "Could not check account balance, maybe connection is down", "danger");
-                this.setState(oldState => ({...oldState, transactionProps:{}, transactPopup: false, monetize: ""}))
-            }
-        );
-        this.web3.eth.getGasPrice().then(
-            (result) => {
-                console.log(result);
-                this.setState(oldState => ({
-                    ...oldState, transactionProps: {
-                        ...oldState.transactionProps,
-                        gasPrice: result.toString(),
-                    },
-                    transactPopup: (oldState.transactionProps.gas && oldState.transactionProps.balance),
-                }));
-                console.log("got gas price of " + result.toString());
-            },
-            (error) => {
-                console.log("could not get gas price");
-                this.notify("Error", "Could not check gas price from the blockchain, maybe connection is down", "danger");
-                this.setState(oldState => ({...oldState, transactionProps:{}, transactPopup: false, monetize: ""}))
+                console.log("Error in getting parameters for requestMonetization");
+                console.log(error.stackTrace);
+                switch (error.type) {
+                    case "estimateGas":
+                        this.notify("Error", "Could not request payment, maybe there's no payment available", "danger");
+                        break;
+                    case "getBalance":
+                        this.notify("Error", "Could not check account balance, maybe connection is down", "danger");
+                        break;
+                    case "getGasPrice":
+                        this.notify("Error", "Could not check gas price from the blockchain, maybe connection is down", "danger");
+                        break;
+                    default:
+                        this.notify("Error", error.stackTrace.message.toString(), "danger");
+                }
+                this.setState(o => ({...o, monetize: ""}));
             }
         );
         this.setState(o => ({...o, monetize: address}));
     };
 
+    /*
+     * Invoked when the user confirms the transaction (after reviewing it in an informative dialog), this function
+     * effectively sends a request for payment to the Catalog and (upon success) shows the Creator their new balance.
+     */
     confirmMonetize = () => {
         this.Catalog.methods.collectPayment(this.state.monetize).send({
             from: this.props.account,
@@ -282,6 +251,108 @@ class CreatorApp extends React.Component {
         this.setState(o => ({...o, transactionProps: {}, transactPopup: false, monetize: "", loading: true}));
     };
 
+    // Begins the creation of a new ContentManagementBase contract, estimating its gas cost.
+    createContent = (name, genre, author, price) => {
+        const abi = JSON.parse(json.contracts["ContentManagementBase.sol:ContentManagementBase"].abi);
+        const bin = "0x" + json.contracts["ContentManagementBase.sol:ContentManagementBase"].bin;
+        const CMB = new this.web3.eth.Contract(abi);
+        this.newContent = CMB.deploy({
+            data: bin,
+            arguments: [
+                this.web3.utils.asciiToHex(name),
+                this.web3.utils.asciiToHex(genre),
+                this.web3.utils.asciiToHex(author),
+                price.toString(),
+            ]});
+        getTransactionParameters(this.web3, this.newContent, this.props.account).then(
+            (result) => this.setState(o => ({...o, transactionProps: result, transactPopup: true})),
+            (error) =>  {
+                console.log("Error in getting parameters for createContent");
+                console.log(error.stackTrace);
+                this.notify("Error", `Could not complete operation (error in ${error.type})`, "danger");
+                this.setState(o => ({...o, creatingContent: false}));
+            }
+        );
+        this.setState(oldState => ({...oldState, closing: false, creatingContent: true}))
+    };
+
+    /*
+     * Invoked when the user confirms the transaction (after reviewing it in an informative dialog), this function
+     * effectively creates a new ContentManagementBase contract and checks if it has been correctly deployed.
+     *
+     * This function WILL NOT publish the new Content on the Catalog, but will ask the user if they want to.
+     */
+    confirmCreate = () => {
+        this.newContent.send({
+            from: this.props.account,
+            gasPrice: this.state.transactionProps.gasPrice,
+            gas: this.state.transactionProps.gas,
+        }).then(
+            (result) => {
+                result.methods.isActiveContent().call({from: this.props.account}).then(
+                    () => {
+                        this.setState(oldState => ({...oldState, createdContent: result.options.address, createdPopup: true, creatingContent: false}));
+                        this.newContent = result;
+                    },
+                    () => {
+                        this.notify("Error", "Contract not created...", "danger");
+                        this.setState(o => ({...o, loading: false, creatingContent: false}));
+                    }
+                )
+            },
+            (error) => {
+                console.log(error);
+                this.notify("Error", "Could not create contract...", "danger");
+                this.setState(o => ({...o, loading: false, creatingContent: false}));
+            }
+        );
+        this.setState(oldState => ({...oldState, loading: true, closing: false, transactionProps: {}, transactPopup: false}));
+    };
+
+    /*
+     * Begins the publishing of a Content (either a freshly-created or a user-provided one) to the Catalog,
+     * estimating the operation's gas cost.
+     */
+    publishContent = () => {
+        this.setState(oldState => ({...oldState, publishingContent: true}));
+        getTransactionParameters(this.web3, this.newContent.methods.publish(this.props.catalog), this.props.account).then(
+            (result) => this.setState(o => ({...o, transactionProps: result, transactPopup: true})),
+            (error) => {
+                console.log("Error in getting parameters for publishContent");
+                console.log(error);
+                if (error.type === "estimateGas")
+                    this.notify("Error", "Could not publish content, maybe it's already in the catalog?", "danger");
+                else
+                    this.notify("Error", `Could not complete operation (error in ${error.type})`, "danger");
+                this.setState(o => ({...o, loading: false, publishingContent: false, createdPopup: false, createdContent: ""}));
+            }
+        );
+    };
+
+    /*
+     * Invoked when the user confirms the transaction (after reviewing it in an informative dialog), this function
+     * effectively publishes a Content to the Catalog.
+     */
+    confirmPublish = () => {
+        this.newContent.methods.publish(this.props.catalog).send({
+            from: this.props.account,
+            gas: this.state.transactionProps.gas,
+            gasPrice: this.state.transactionProps.gasPrice,
+        }).then(
+            (result) => {
+                this.notify("Success!", `Contract published! Refresh the list to see it`, "success");
+                this.setState(o => ({...o, loading: false}));
+            },
+            (error) => {
+                this.notify("Error", "Error in publishing contract!", "danger");
+                this.setState(o => ({...o, loading: false}));
+            }
+        );
+        this.newContent = {};
+        this.setState(oldState => ({...oldState, loading: true, transactionProps:{}, publishingContent: false, transactPopup: false, createdPopup: false, createdContent: ""}))
+    };
+
+    // Renders the drawer menu.
     menu = () =>
         <List>
             <Tooltip title={"List this account's Contents"} placement={"right"}>
@@ -309,17 +380,32 @@ class CreatorApp extends React.Component {
                     <ListItemText secondary={"Delete a Content"}/>
                 </ListItem>
             </Tooltip>
-            {(this.state.panel === Panels.LIST_CONTENT) ? <Divider/> : null}
-            {(this.state.panel === Panels.LIST_CONTENT) ?
+            {(this.state.panel === Panels.LIST_CONTENT) && <Divider/>}
+            {(this.state.panel === Panels.LIST_CONTENT) &&
                 <Tooltip title={"Update Content list"} placement={"right"}>
                     <ListItem button key={"update"} onClick={this.updateContentList}>
                         <ListItemIcon><Update/></ListItemIcon>
                         <ListItemText secondary={"Update List"}/>
                     </ListItem>
-                </Tooltip> : null
-            }
+                </Tooltip>}
         </List>;
 
+    // Renders the app bar title (depending on the current panel).
+    renderTitle = () => {
+        const { classes } = this.props;
+        switch (this.state.panel) {
+            case Panels.LIST_CONTENT: return [makeTitle("My Contents", classes.grow)];
+            case Panels.NEW_CONTENT: return [makeTitle("Add a new Content", classes.grow)];
+            case Panels.PUBLISH: return [makeTitle("Publish a Content", classes.grow)];
+            case Panels.DEL_CONTENT: return [makeTitle("Delete a Content", classes.grow)];
+            default: return [makeTitle("", classes.grow)];
+        }
+    };
+
+    /*
+     * Updates the list of content belonging to the current Creator, also registering callbacks for the "Content
+     * Provided" Solidity events.
+     */
     updateContentList = () => {
         this.Catalog.methods.getCreatorContentList().call({from: this.props.account})
             .then(
@@ -338,7 +424,7 @@ class CreatorApp extends React.Component {
                             });
                             this.registerProvide(result[1][i]);
                         }
-                        this.setState(oldState => {console.log(list); return ({...oldState, contentList: list})});
+                        this.setState(oldState => ({...oldState, contentList: list}));
                         this.notify("List updated!", "List of content has been updated", "material");
                     }
                 },
@@ -349,6 +435,7 @@ class CreatorApp extends React.Component {
             )
     };
 
+    // Registers a callback for the "Provide Content" event relative to the selected Content.
     registerProvide = (address) => {
         if (!this.registered.some(item => item === address)) {
             const abi = JSON.parse(json.contracts["ContentManagementBase.sol:ContentManagementBase"].abi);
@@ -367,93 +454,12 @@ class CreatorApp extends React.Component {
         }
     };
 
-    createContent = (name, genre, author, price) => {
-        const abi = JSON.parse(json.contracts["ContentManagementBase.sol:ContentManagementBase"].abi);
-        const bin = "0x" + json.contracts["ContentManagementBase.sol:ContentManagementBase"].bin;
-        const CMB = new this.web3.eth.Contract(abi);
-        this.newContent = CMB.deploy({
-            data: bin,
-            arguments: [
-                this.web3.utils.asciiToHex(name),
-                this.web3.utils.asciiToHex(genre),
-                this.web3.utils.asciiToHex(author),
-                price.toString(),
-            ]});
-        this.web3.eth.getBalance(this.props.account).then(
-            (result) => {
-                this.setState(oldState => ({
-                    ...oldState, transactionProps: {
-                        ...oldState.transactionProps,
-                        balance: result.toString(),
-                    },
-                    transactPopup: (oldState.transactionProps.gas && oldState.transactionProps.gasPrice),
-                }));
-                console.log("got balance of " + result.toString());
-            },
-            (error) => console.log("could not get balance for account")
-        );
-        this.newContent.estimateGas((err, result) => {
-            if (err) console.log('could not estimate gas');
-            else {
-                this.setState(oldState => ({
-                    ...oldState, transactionProps: {
-                        ...oldState.transactionProps,
-                        gas: result.toString(),
-                    },
-                    transactPopup: (oldState.transactionProps.balance && oldState.transactionProps.gasPrice),
-                }));
-                console.log("got gas estimation of " + result.toString());
-            }
-        });
-        this.web3.eth.getGasPrice().then(
-            (result) => {
-                console.log(result);
-                this.setState(oldState => ({
-                    ...oldState, transactionProps: {
-                        ...oldState.transactionProps,
-                        gasPrice: result.toString(),
-                    },
-                    transactPopup: (oldState.transactionProps.gas && oldState.transactionProps.balance),
-                }));
-                console.log("got gas price of " + result.toString());
-            },
-            (error) => console.log("could not get gas price")
-        );
-        this.setState(oldState => ({...oldState, closing: false, creatingContent: true}))
-    };
-
-    confirmOpen = () => {
-        this.newContent.send({
-            from: this.props.account,
-            gasPrice: this.state.transactionProps.gasPrice,
-            gas: this.state.transactionProps.gas,
-        }).then(
-            (result) => {
-                console.log(result);
-                result.methods.isActiveContent().call({from: this.props.account}).then(
-                    () => {
-                        this.setState(oldState => ({...oldState, createdContent: result.options.address, createdPopup: true, creatingContent: false}));
-                        this.newContent = result;
-                    },
-                    () => {
-                        this.notify("Error", "Contract not created...", "danger");
-                        this.setState(o => ({...o, loading: false}));
-                    }
-                )
-            },
-            (error) => {
-                console.log(error);
-                this.notify("Error", "Could not create contract...", "danger");
-                this.setState(o => ({...o, loading: false}));
-            }
-        );
-        //this.newContent = {};
-        this.setState(oldState => ({...oldState, loading: true, closing: false, transactionProps: {}, transactPopup: false}));
-    };
-
-    handleDialog = () =>
-        this.setState(oldState => ({...oldState, createdPopup: false, createdContent: ""}));
-
+    /*
+     * This is a React state function that will be called only once, after the component is mounted in the virtual
+     * DOM but before it gets rendered.
+     *
+     * In particular, this function adds an event listener that reacts to Solidity "Payment Available" events.
+     */
     componentDidMount() {
         this.updateContentList();
         this.Catalog.events.PaymentAvailable({fromBlock: "latest"})
@@ -466,95 +472,11 @@ class CreatorApp extends React.Component {
             });
     };
 
-    publishContent = () => {
-        this.setState(oldState => ({...oldState, publishingContent: true}));
-        this.newContent.methods.publish(this.props.catalog).estimateGas({from: this.props.account}).then(
-            (result) => {
-                this.setState(oldState => ({
-                    ...oldState,
-                    transactionProps: {
-                        ...oldState.transactionProps,
-                        gas: result.toString()
-                    },
-                    transactPopup: (oldState.transactionProps.balance && oldState.transactionProps.gasPrice),
-                }))
-            },
-            (error) => {
-                this.notify("Error", "Could not publish content, maybe it's already in the catalog?", "danger");
-                console.log("Could not estimate publish gas");
-                this.setState(oldState => ({...oldState, transactionProps:{}, loading: false, publishingContent: false, transactPopup: false, createdPopup: false, createdContent: ""}))
-            }
-        );
-        this.web3.eth.getBalance(this.props.account).then(
-            (result) => {
-                this.setState(oldState => ({
-                    ...oldState,
-                    transactionProps: {
-                        ...oldState.transactionProps,
-                        balance: result.toString()
-                    },
-                    transactPopup: (oldState.transactionProps.gas && oldState.transactionProps.gasPrice),
-                }))
-            },
-            (error) => {
-                console.log("could not get balance for account");
-                this.notify("Error", "Could not get balance for the current account, check the connection", "danger");
-                this.setState(oldState => ({...oldState, transactionProps:{}, loading: false, publishingContent: false, transactPopup: false, createdPopup: false, createdContent: ""}))
-            }
-        );
-        this.web3.eth.getGasPrice().then(
-            (result) => {
-                this.setState(oldState => ({
-                    ...oldState,
-                    transactionProps: {
-                        ...oldState.transactionProps,
-                        gasPrice: result.toString()
-                    },
-                    transactPopup: (oldState.transactionProps.balance && oldState.transactionProps.gas),
-                }))
-            },
-            (error) => {
-                this.notify("Error", "Could not get gas price from the blockchain, check the connection", "danger");
-                console.log("could not get gas price for publishing");
-                this.setState(oldState => ({...oldState, transactionProps:{}, loading: false, publishingContent: false, transactPopup: false, createdPopup: false, createdContent: ""}))
-            }
-        );
-    };
-
-    confirmPublish = () => {
-        this.newContent.methods.publish(this.props.catalog).send({
-            from: this.props.account,
-            gas: this.state.transactionProps.gas,
-            gasPrice: this.state.transactionProps.gasPrice,
-        }).then(
-            (result) => {
-                this.notify("Success!", `Contract published! Refresh the list to see it`, "success");
-                this.setState(o => ({...o, loading: false}));
-            },
-            (error) => {
-                this.notify("Error", "Error in publishing contract!", "danger");
-                this.setState(o => ({...o, loading: false}));
-            }
-        );
-        this.newContent = {};
-        this.setState(oldState => ({...oldState, loading: true, transactionProps:{}, publishingContent: false, transactPopup: false, createdPopup: false, createdContent: ""}))
-    };
-
+    // Starts the publishing of the Content selected by the Creator.
     initiatePublish = () => {
         const abi = JSON.parse(json.contracts["ContentManagementBase.sol:ContentManagementBase"].abi);
-        this.newContent =  new this.web3.eth.Contract(abi, this.state.selContent);
+        this.newContent =  new this.web3.eth.Contract(abi, this.state.selectedContent);
         this.publishContent();
-    };
-
-    renderTitle = () => {
-        const { classes } = this.props;
-        switch (this.state.panel) {
-            case Panels.LIST_CONTENT: return [makeTitle("My Contents", classes.grow)];
-            case Panels.NEW_CONTENT: return [makeTitle("Add a new Content", classes.grow)];
-            case Panels.PUBLISH: return [makeTitle("Publish a Content", classes.grow)];
-            case Panels.DEL_CONTENT: return [makeTitle("Delete a Content", classes.grow)];
-            default: return [makeTitle("", classes.grow)];
-        }
     };
 
     render() {
@@ -564,7 +486,7 @@ class CreatorApp extends React.Component {
             contentList,
             transactionProps,
             transactPopup,
-            selContent,
+            selectedContent,
             error,
             creatingContent,
             publishingContent,
@@ -625,7 +547,7 @@ class CreatorApp extends React.Component {
                                             name="Content"
                                             label="Content Address"
                                             className={classes.textField}
-                                            value={selContent}
+                                            value={selectedContent}
                                             onChange={this.handleContent}
                                             error={error}
                                         />
@@ -648,7 +570,7 @@ class CreatorApp extends React.Component {
                                             name="Content"
                                             label="Content Address"
                                             className={classes.textField}
-                                            value={selContent}
+                                            value={selectedContent}
                                             onChange={this.handleContent}
                                             error={error}
                                         />
@@ -667,7 +589,7 @@ class CreatorApp extends React.Component {
                     {...transactionProps}
                     ok={(createdPopup || publishingContent)? this.confirmPublish :
                         (monetize? this.confirmMonetize :
-                        (closing? this.confirmClose : this.confirmOpen))}
+                        (closing? this.confirmDelete : this.confirmCreate))}
                     cancel={() => this.setState(oldState => ({...oldState, closing: false, transactionProps: {}, transactPopup: false}))}
                 /> : ""}
                 <Dialog

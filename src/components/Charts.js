@@ -1,3 +1,17 @@
+/*
+ *
+ *  University di Pisa - Master's Degree in Computer Science and Networking
+ *
+ *  Final Project for the course of Peer to Peer Systems and Blockchains
+ *
+ *  Teacher: Prof. Laura Ricci
+ *
+ *  Candidate: Orlando Leombruni, matricola 475727
+ *
+ *  File: Charts.js
+ *
+ */
+
 import React from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -24,8 +38,13 @@ import {
 } from '@material-ui/icons';
 import { ChartsStyle as styles } from "../styles/MaterialCustomStyles";
 
-class Feedbacks extends React.Component {
+/*
+ * Feedbacks Class
+ *
+ * A React Component that lists the top Contents for each feedback category.
+ */
 
+class Feedbacks extends React.Component {
 
     render() {
         const { avg, appreciation, fairness, suggest } = this.props;
@@ -77,6 +96,15 @@ Feedbacks.propTypes = {
     suggest: PropTypes.string.isRequired,
 };
 
+// Default text shown while waiting for the actual results.
+const defaultValue = "Loading...";
+
+/*
+ * Charts Class
+ *
+ * A React Component that shows to the user various information about Contents in the Catalog, such as the top rated
+ * or the most recent ones.
+ */
 class Charts extends React.Component {
 
     constructor(props) {
@@ -88,34 +116,37 @@ class Charts extends React.Component {
 
     state = {
         global: {
-            recentContents: ["Loading...", "Loading...", "Loading...", "Loading...", "Loading..."],
-            topRatedAvg: "Loading...",
-            topRatedAppreciation: "Loading...",
-            topRatedFairness: "Loading...",
-            topRatedSuggest: "Loading...",
+            recentContents: [defaultValue, defaultValue, defaultValue, defaultValue, defaultValue],
+            topRatedAvg: defaultValue,
+            topRatedAppreciation: defaultValue,
+            topRatedFairness: defaultValue,
+            topRatedSuggest: defaultValue,
         },
         author: {
             name: "",
-            mostRecent: "Loading...",
-            mostViewed: "Loading...",
-            topRatedAvg: "Loading...",
-            topRatedAppreciation: "Loading...",
-            topRatedFairness: "Loading...",
-            topRatedSuggest: "Loading...",
+            mostRecent: defaultValue,
+            mostViewed: defaultValue,
+            topRatedAvg: defaultValue,
+            topRatedAppreciation: defaultValue,
+            topRatedFairness: defaultValue,
+            topRatedSuggest: defaultValue,
         },
         genre: {
             name: "",
-            mostRecent: "Loading...",
-            mostViewed: "Loading...",
-            topRatedAvg: "Loading...",
-            topRatedAppreciation: "Loading...",
-            topRatedFairness: "Loading...",
-            topRatedSuggest: "Loading...",
+            mostRecent: defaultValue,
+            mostViewed: defaultValue,
+            topRatedAvg: defaultValue,
+            topRatedAppreciation: defaultValue,
+            topRatedFairness: defaultValue,
+            topRatedSuggest: defaultValue,
         },
         authorAnchorEl: null,
         genreAnchorEl: null,
     };
 
+    /*
+     * These functions control the behaviour of the "change author/genre" menus.
+     */
     showAuthors = event => {
         const target = event.currentTarget;
         this.setState(o => ({...o, authorAnchorEl: target}))
@@ -133,7 +164,6 @@ class Charts extends React.Component {
         this.setState(o => ({...o, genreAnchorEl: null}));
 
     handleAuthorMenu = (event, index) => {
-        console.log(`refreshing author ${this.props.authors[index]}`);
         this.setState(o => ({
             ...o,
             author: {
@@ -149,7 +179,6 @@ class Charts extends React.Component {
     };
 
     handleGenreMenu = (event, index) => {
-        console.log(`refreshing genre ${this.props.genres[index]}`);
         this.setState(o => ({
             ...o,
             genre: {
@@ -164,6 +193,9 @@ class Charts extends React.Component {
         }), this.refreshGenre);
     };
 
+    /*
+     * This function loads information about top/most recent contents of a specified genre.
+     */
     refreshGenre = () => {
         this.setState(o => ({...o, genreAnchorEl: null}));
         const {Catalog, web3, account} = this.props;
@@ -208,6 +240,9 @@ class Charts extends React.Component {
         });
     };
 
+    /*
+     * This function loads information about top/most recent contents of a specified author.
+     */
     refreshAuthor = () => {
         this.setState(o => ({...o, authorAnchorEl: null}));
         const { Catalog, web3, account } = this.props;
@@ -252,8 +287,15 @@ class Charts extends React.Component {
         });
     };
 
+    /*
+     * This is a React state function that will be called only once, after the component is mounted in the virtual
+     * DOM but before it gets rendered.
+     *
+     * In particular, this function asks the Catalog contract for information about "global" (i.e. not author-
+     * or genre-related) recent and top Contents, then loads the information about the default author's and genre's
+     * Contents. (The default author and genre are usually the ones of the first Content inserted in the Catalog).
+     */
     componentDidMount() {
-        console.log("CDM");
         const { Catalog, web3, account } = this.props;
         Catalog.methods.getNewContentsList(5).call({from: account}).then(
             (result) => {
@@ -316,11 +358,7 @@ class Charts extends React.Component {
                 <Grid item xs={12}>
                     <Card className={classes.card}>
                         <CardHeader
-                            avatar={
-                                <Avatar className={classes.avatarRed}>
-                                    O
-                                </Avatar>
-                            }
+                            avatar={<Avatar className={classes.avatarRed}>O</Avatar>}
                             title={"Overview"}
                             subheader={"Information about all contents"}
                         />
@@ -353,14 +391,17 @@ class Charts extends React.Component {
                 <Grid item xs={6}>
                     <Card className={classes.card}>
                         <CardHeader
-                            avatar={
-                                <Avatar className={classes.avatarGreen}>
-                                    A
-                                </Avatar>
-                            }
+                            avatar={<Avatar className={classes.avatarGreen}>A</Avatar>}
                             title={"Author"}
                             subheader={"Information about contents by a specific author"}
-                            action={<Chip onClick={this.showAuthors} variant={"outlined"} color={"secondary"} label={author.name} avatar={<Avatar>{author.name[0].toUpperCase()}</Avatar>}/>}
+                            action={
+                                <Chip
+                                    onClick={this.showAuthors}
+                                    variant={"outlined"}
+                                    color={"secondary"}
+                                    label={author.name}
+                                    avatar={<Avatar>{author.name[0].toUpperCase()}</Avatar>} />
+                            }
                         />
                         <Menu
                             id={"-menu"}
@@ -377,7 +418,7 @@ class Charts extends React.Component {
                                 <MenuItem key={item} onClick={event => this.handleAuthorMenu(event, idx)}>
                                     {item}
                                 </MenuItem>
-                                ))}
+                            ))}
                         </Menu>
                         <CardContent>
                             <Grid container>
@@ -417,14 +458,17 @@ class Charts extends React.Component {
                 <Grid item xs={6}>
                     <Card className={classes.card}>
                         <CardHeader
-                            avatar={
-                                <Avatar className={classes.avatarBlue}>
-                                    G
-                                </Avatar>
-                            }
+                            avatar={<Avatar className={classes.avatarBlue}>G</Avatar>}
                             title={"Genre"}
                             subheader={"Information about contents of a specific genre"}
-                            action={<Chip onClick={this.showGenres} variant={"outlined"} color={"secondary"} label={genre.name} avatar={<Avatar>{genre.name[0].toUpperCase()}</Avatar>}/>}
+                            action={
+                                <Chip
+                                    onClick={this.showGenres}
+                                    variant={"outlined"}
+                                    color={"secondary"}
+                                    label={genre.name}
+                                    avatar={<Avatar>{genre.name[0].toUpperCase()}</Avatar>}/>
+                            }
                         />
                         <Menu
                             id={"-menu"}
@@ -441,7 +485,7 @@ class Charts extends React.Component {
                                 <MenuItem key={item} onClick={event => this.handleGenreMenu(event, idx)}>
                                     {item}
                                 </MenuItem>
-                                ))}
+                            ))}
                         </Menu>
                         <CardContent>
                             <Grid container>

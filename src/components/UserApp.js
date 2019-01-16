@@ -1,3 +1,16 @@
+/*
+ *
+ *  University di Pisa - Master's Degree in Computer Science and Networking
+ *
+ *  Final Project for the course of Peer to Peer Systems and Blockchains
+ *
+ *  Teacher: Prof. Laura Ricci
+ *
+ *  Candidate: Orlando Leombruni, matricola 475727
+ *
+ *  File: UserApp.js
+ *
+ */
 import React from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -37,6 +50,9 @@ import FeedbackForm from "./FeedbackForm";
 import Charts from "./Charts";
 import { UserAppStyle as styles } from "../styles/MaterialCustomStyles";
 
+/*
+ * Enum-like object for the various sections of the application.
+ */
 const Panels = Object.freeze({
     FULL_LIST: Symbol("list"),
     CHARTS: Symbol("charts"),
@@ -45,6 +61,14 @@ const Panels = Object.freeze({
     BUY: Symbol("buy")
 });
 
+/*
+ * UserApp Class
+ *
+ * A React Component that represents the entire User (consumer) portion of the app.
+ *
+ * It allows Users to check trending content, purchase premium subscriptions and access to Contents, and leave
+ * feedback.
+ */
 class UserApp extends React.Component {
 
     constructor(props) {
@@ -57,7 +81,6 @@ class UserApp extends React.Component {
         this.Catalog = new this.web3.eth.Contract(abi, this.props.catalog);
         this.premiumUpdates = null;
     }
-
 
     state = {
         authorList: [],
@@ -85,13 +108,14 @@ class UserApp extends React.Component {
         transactionProps: {},
     };
 
+    // State not used in rendering (doesn't have to be changed by React.Component.setState)
     otherState = {
         contentBuying: -1,
         isPremiumTransaction: false,
     };
 
+    // Displays a notification in the upper right portion of the screen.
     notify(title, message, type, time) {
-        console.log(time + " " + (time || 2000));
         this.notificationRef.current.addNotification({
             title,
             message,
@@ -105,10 +129,12 @@ class UserApp extends React.Component {
         });
     }
 
+    // Changes the current panel (section of the app).
     changePanel = (panel) => () => {
         this.setState(oldState => ({...oldState, panel: panel}));
     };
 
+    // Renders the drawer menu.
     menu = () =>
         <List>
             <Tooltip title={"List all contents in the Catalog"} placement={"right"}>
@@ -153,11 +179,11 @@ class UserApp extends React.Component {
             }
         </List>;
 
+    // Renders the app bar title (depending on the current panel).
     renderTitle = () => {
         const { classes } = this.props;
         const { panel, searchTerm } = this.state;
         switch(panel) {
-            //case Panels.SEARCH: return "Search";
             case Panels.FULL_LIST:
                 return (
                     [
@@ -191,6 +217,7 @@ class UserApp extends React.Component {
         }
     };
 
+    // Filters the content list in real-time according to user input in the search bar.
     filterContent = (event) => {
         const { target } = event;
         const filtered = this.state.contentList.filter(value => (
@@ -201,6 +228,7 @@ class UserApp extends React.Component {
         this.setState(oldState => ({...oldState, filteredList: filtered, searchTerm: target.value}));
     };
 
+    // Refreshes the content list (and also the list of authors and genres).
     updateContentList = () => {
         this.setState(o => ({...o, loading: true}));
         this.Catalog.methods.getStatistics().call({from: this.props.account})
@@ -245,16 +273,69 @@ class UserApp extends React.Component {
             )
     };
 
+    // Refreshes the list of Content bought by the User.
+    refreshBought = () => {
+        this.Catalog.methods.grantsAvailable().call({from: this.props.account}).then(
+            (result) => {
+                if (!result) {
+                    this.notify("Error", "Could not retrieve bought content", "danger");
+                } else {
+                    const list = [];
+                    for (let i = 0; i < result.length; i++) {
+                        list.push({
+                            index: i,
+                            description: this.web3.utils.hexToAscii(result[i]),
+                        })
+                    }
+                    this.setState(oldState => ({...oldState, loading: false, boughtContent: list}));
+                    this.notify("Success!", "Bought Content list updated!", "success");
+                }
+            },
+            (error) => {
+                console.log(error);
+                this.notify("Error", "Could not retrieve bought content", "danger");
+                this.setState(o => ({...o, loading: false}))
+            }
+        );
+        this.setState(o => ({...o, loading: true}));
+    };
 
+    // Refreshes the list of Content for which the User can leave feedback.
+    refreshFeedback = () => {
+        this.Catalog.methods.feedbackAvailable().call({from: this.props.account}).then(
+            (result) => {
+                if (!result[0] || !result[1]) {
+                    this.notify("Error", "Could not retrieve list of content to leave feedback for", "danger");
+                } else {
+                    const list = [];
+                    for (let i = 0; i < result[0].length; i++) {
+                        list.push({
+                            index: i,
+                            description: this.web3.utils.hexToAscii(result[0][i]),
+                            address: result[1][i],
+                        })
+                    }
+                    this.setState(oldState => ({...oldState, loading: false, feedbackToLeave: list}));
+                    this.notify("Success!", "List of feedbacks to leave updated!", "success");
+                }
+            },
+            (error) => {
+                console.log(error);
+                this.notify("Error", "Could not retrieve list of content to leave feedback for", "danger");
+                this.setState(o => ({...o, loading: false}));
+            }
+        );
+        this.setState(o => ({...o, loading: true}))
+    };
+
+    // Starts the "buy" operation (for both premium and non-premium users), estimating its gas cost.
     buy = acc => () => {
         const { contentList } = this.state;
         const { contentBuying, isPremiumTransaction: premium } = this.otherState;
         if (contentBuying < 0) {
             this.notify("Error", "No selected content", "danger");
         } else {
-            premium && console.log("content is " + contentList[contentBuying].description);
             const content = this.web3.utils.asciiToHex(contentList[contentBuying].description);
-            console.log("buying for " + (acc ? acc : "me"));
             const method = (premium)? this.Catalog.methods.getContentPremium(content) :
                 ((acc) ? this.Catalog.methods.giftContent(content, acc) : this.Catalog.methods.getContent(content));
 
@@ -264,6 +345,7 @@ class UserApp extends React.Component {
                     this.setState(o => ({...o, transactionProps: result, transactPopup: true}))
                 },
                 (error) => {
+                    console.log("Error in getting parameters for buy");
                     console.log(error.stackTrace);
                     switch(error.type) {
                         case "estimateGas":
@@ -279,7 +361,7 @@ class UserApp extends React.Component {
                             this.notify("Error", "Could not get balance for the current account, check the connection", "danger");
                             break;
                         default:
-                            break;
+                            this.notify("Error", error.stackTrace.message.toString(), "danger");
                     }
                     this.otherState.contentBuying = -1;
                     this.otherState.isPremiumTransaction = false;
@@ -292,94 +374,17 @@ class UserApp extends React.Component {
                     }));
                 }
             );
-
-            /*method.estimateGas({from: this.props.account, value: (premium ? 0 : contentList[contentBuying].price)}).then(
-                (result) => {
-                    this.setState(oldState => ({
-                        ...oldState,
-                        transactionProps: {
-                            ...oldState.transactionProps,
-                            gas: result.toString()
-                        },
-                        transactPopup: (oldState.transactionProps.balance && oldState.transactionProps.gasPrice),
-                    }))
-                },
-                (error) => {
-                    this.notify("Error",
-                        (premium) ? "Unable to obtain access to Content, check if you have a subscription" :
-                        "Unable to buy Content, check if already bought or if recipient has a premium subscription",
-                        "danger");
-                    console.log("Could not estimate get/gift gas");
-                    console.log(error);
-                    this.otherState.contentBuying = -1;
-                    this.otherState.isPremiumTransaction = false;
-                    this.setState(oldState => ({
-                        ...oldState,
-                        transactionProps: {},
-                        transactPopup: false,
-                        buyingAction: false,
-                        gifting: "",
-                    }))
-                }
-            );
-            this.web3.eth.getBalance(this.props.account).then(
-                (result) => {
-                    this.setState(oldState => ({
-                        ...oldState,
-                        transactionProps: {
-                            ...oldState.transactionProps,
-                            balance: result.toString()
-                        },
-                        transactPopup: (oldState.transactionProps.gas && oldState.transactionProps.gasPrice),
-                    }))
-                },
-                (error) => {
-                    console.log("could not get balance for account");
-                    this.notify("Error", "Could not get balance for the current account, check the connection", "danger");
-                    this.otherState.contentBuying = -1;
-                    this.otherState.isPremiumTransaction = false;
-                    this.setState(oldState => ({
-                        ...oldState,
-                        transactionProps: {},
-                        transactPopup: false,
-                        buyingAction: false,
-                        gifting: "",
-                    }))
-                }
-            );
-            this.web3.eth.getGasPrice().then(
-                (result) => {
-                    this.setState(oldState => ({
-                        ...oldState,
-                        transactionProps: {
-                            ...oldState.transactionProps,
-                            gasPrice: result.toString()
-                        },
-                        transactPopup: (oldState.transactionProps.balance && oldState.transactionProps.gas),
-                    }))
-                },
-                (error) => {
-                    this.notify("Error", "Could not get gas price from the blockchain, check the connection", "danger");
-                    this.otherState.contentBuying = -1;
-                    this.otherState.isPremiumTransaction = false;
-                    console.log("could not get gas price for publishing");
-                    this.setState(oldState => ({
-                        ...oldState,
-                        transactionProps: {},
-                        transactPopup: false,
-                        buyingAction: false,
-                        gifting: "",
-                    }))
-                }
-            );*/
             this.setState(oldState => ({...oldState, gifting: acc, buyingPrice: 0, buyingAction: true}));
         }
     };
 
+    /*
+     * Invoked when the user confirms the transaction (after reviewing it in an informative dialog), this function
+     * effectively asks the Catalog for access to the content, paying for it if the user is not a Premium subscriber.
+     */
     confirmBuy = () => {
         const { contentList, gifting, transactionProps } = this.state;
         const { contentBuying, isPremiumTransaction } = this.otherState;
-        console.log("isPremiumTransaction: " + isPremiumTransaction);
         if (contentBuying < 0) {
             this.notify("Error", "No selected content", "danger");
         } else {
@@ -406,130 +411,41 @@ class UserApp extends React.Component {
         this.setState(oldState => ({...oldState, loading: true, gifting: "", buyingAction: false, transactionProps: {}, transactPopup: false}))
     };
 
-    refreshBought = () => {
-        this.Catalog.methods.grantsAvailable().call({from: this.props.account}).then(
-            (result) => {
-                console.log(result);
-                if (!result) {
-                    this.notify("Error", "Could not retrieve bought content", "danger");
-                } else {
-                    const list = [];
-                    for (let i = 0; i < result.length; i++) {
-                        list.push({
-                            index: i,
-                            description: this.web3.utils.hexToAscii(result[i]),
-                        })
-                    }
-                    this.setState(oldState => ({...oldState, loading: false, boughtContent: list}));
-                    this.notify("Success!", "Bought Content list updated!", "success");
-                }
-            },
-            (error) => {
-                console.log(error);
-                this.notify("Error", "Could not retrieve bought content", "danger");
-                this.setState(o => ({...o, loading: false}))
-            }
-        );
-        this.setState(o => ({...o, loading: true}));
-    };
-
-    refreshFeedback = () => {
-        this.Catalog.methods.feedbackAvailable().call({from: this.props.account}).then(
-            (result) => {
-                console.log(result);
-                if (!result[0] || !result[1]) {
-                    this.notify("Error", "Could not retrieve list of content to leave feedback for", "danger");
-                } else {
-                    const list = [];
-                    for (let i = 0; i < result[0].length; i++) {
-                        list.push({
-                            index: i,
-                            description: this.web3.utils.hexToAscii(result[0][i]),
-                            address: result[1][i],
-                        })
-                    }
-                    this.setState(oldState => ({...oldState, loading: false, feedbackToLeave: list}));
-                    this.notify("Success!", "List of feedbacks to leave updated!", "success");
-                }
-            },
-            (error) => {
-                console.log(error);
-                this.notify("Error", "Could not retrieve list of content to leave feedback for", "danger");
-                this.setState(o => ({...o, loading: false}));
-            }
-        );
-        this.setState(o => ({...o, loading: true}))
-    };
-
+    // Starts the "leave feedback for a content" operation, estimating its gas cost.
     leaveFeedback = (idx) => () => {
         const content = this.state.feedbackToLeave[idx];
         if (content.address) {
-            console.log("feedback " + content);
-            this.Catalog.methods.leaveFeedback(content.address, 5, 5, 5).estimateGas({from: this.props.account}).then(
-                (result) => this.setState(o => ({
-                    ...o,
-                    transactionProps: {...o.transactionProps, gas: result.toString()},
-                    transactPopup: (o.transactionProps.balance && o.transactionProps.gasPrice && o.feedback),
-                })),
-                (error) => {
-                    this.notify("Error", "Could not estimate gas for leaving feedback", "danger");
-                    console.log("Could not estimate feedback gas");
-                    console.log(error);
-                    this.setState(oldState => ({
-                        ...oldState,
-                        feedbackLeaving: null,
-                        feedbackOpen: false,
-                        transactionProps: {},
-                        transactPopup: false,
-                    }));
-                }
-            );
-            this.web3.eth.getBalance(this.props.account).then(
-                (result) => this.setState(o => ({
-                    ...o,
-                    transactionProps: {...o.transactionProps, balance: result.toString()},
-                })),
-                (error) => {
-                    console.log("could not get balance for account");
-                    this.notify("Error", "Could not get balance for the current account, check the connection", "danger");
-                    this.setState(o => ({
-                        ...o,
-                        feedbackLeaving: null,
-                        feedbackOpen: false,
-                        transactionProps: {},
-                        transactPopup: (o.transactionProps.gas && o.transactionProps.gasPrice && o.feedback),
-                    }));
-                }
-            );
-            this.web3.eth.getGasPrice().then(
-                (result) => this.setState(o => ({
-                    ...o,
-                    transactionProps: {...o.transactionProps, gasPrice: result.toString()},
-                    transactPopup: (o.transactionProps.balance && o.transactionProps.gas && o.feedback),
-                })),
-                (error) => {
-                    this.notify("Error", "Could not get gas price from the blockchain, check the connection", "danger");
-                    console.log("could not get gas price for publishing");
-                    this.setState(oldState => ({
-                        ...oldState,
-                        feedbackLeaving: null,
-                        feedbackOpen: false,
-                        transactionProps: {},
-                        transactPopup: false,
-                    }));
-                }
-            );
             this.setState(o => ({...o, feedbackLeaving: idx, feedbackOpen: true}));
         }
     };
 
+    feedbackFormSubmitted = (feedback) => () => {
+        const content = this.state.feedbackToLeave[this.state.feedbackLeaving];
+        if (content.address) {
+            getTransactionParameters(this.web3, this.Catalog.methods.leaveFeedback(content.address, 5, 5, 5), this.props.account).then(
+                (result) => this.setState(o => ({
+                    ...o,
+                    feedback: feedback,
+                    transactionProps: result,
+                    transactPopup: true
+                })),
+                (error) => {
+                    console.log("Error in getting parameters for leaveFeedback");
+                    console.log(error);
+                    this.notify("Error", `Could not complete operation (error in ${error.type})`, "danger");
+                    this.setState(o => ({...o, feedbackLeaving: null, feedbackOpen: false}));
+                }
+            )
+        }
+    };
+
+    /*
+    * Invoked when the user confirms the transaction (after reviewing it in an informative dialog), this function
+    * effectively writes the user's feedback for the current Content to the Catalog.
+    */
     confirmedFeedback = () => {
         const { feedbackLeaving, feedbackToLeave, transactionProps, feedback } = this.state;
         const { appreciation, fairness, suggest } = feedback;
-        console.log("confirm feedback");
-        console.log(feedback);
-        console.log(feedbackLeaving);
-        console.log(feedbackToLeave[feedbackLeaving]);
         this.Catalog.methods
             .leaveFeedback(feedbackToLeave[feedbackLeaving].address, appreciation, fairness, suggest)
             .send({from: this.props.account, gas: transactionProps.gas, gasPrice: transactionProps.gasPrice})
@@ -539,7 +455,6 @@ class UserApp extends React.Component {
                     const feedList = feedbackToLeave.filter((item, idx) => idx !== feedbackLeaving).map((item, idx) =>
                         ({...item, index: idx})
                     );
-                    console.log(feedList);
                     this.setState(o => ({...o, loading: false, feedbackLeaving: null, feedback: null, feedbackToLeave: feedList}));
                 },
                 (error) => {
@@ -552,93 +467,27 @@ class UserApp extends React.Component {
         this.setState(o => ({...o, loading: true, feedbackOpen: false, transactionProps: {}, transactPopup: false}));
     };
 
+    // Starts the consumption of a bought Content, estimating its gas cost.
     consume = (idx) => () => {
-        console.log("consume" + idx);
         const content = this.state.boughtContent[idx];
         if (content.address) {
             const abi = JSON.parse(json.contracts["ContentManagementBase.sol:ContentManagementBase"].abi);
             const CMB = new this.web3.eth.Contract(abi, content.address);
-
-            CMB.methods.consumeContent().estimateGas({from: this.props.account}).then(
-                (result) => {
-                    this.setState(oldState => ({
-                        ...oldState,
-                        transactionProps: {
-                            ...oldState.transactionProps,
-                            gas: result.toString()
-                        },
-                        transactPopup: (oldState.transactionProps.balance && oldState.transactionProps.gasPrice),
-                    }))
-                },
+            getTransactionParameters(this.web3, CMB.methods.consumeContent(), this.props.account).then(
+                (result) => this.setState(o => ({...o, transactionProps: result, transactPopup: true})),
                 (error) => {
-                    this.notify("Error", "Could not estimate gas for consuming content", "danger");
-                    console.log("Could not estimate consume gas");
+                    console.log("Error in getting parameters for consume");
                     console.log(error);
-                    this.setState(oldState => ({
-                        ...oldState,
-                        transactionProps: {},
-                        transactPopup: false,
-                        consuming: null,
-                    }))
+                    this.notify("Error", `Could not complete operation (error in ${error.type})`, "danger");
+                    this.setState(o => ({...o, consuming: null}))
                 }
             );
-            this.web3.eth.getBalance(this.props.account).then(
-                (result) => {
-                    this.setState(oldState => ({
-                        ...oldState,
-                        transactionProps: {
-                            ...oldState.transactionProps,
-                            balance: result.toString()
-                        },
-                        transactPopup: (oldState.transactionProps.gas && oldState.transactionProps.gasPrice),
-                    }))
-                },
-                (error) => {
-                    console.log("could not get balance for account");
-                    this.notify("Error", "Could not get balance for the current account, check the connection", "danger");
-                    this.setState(oldState => ({
-                        ...oldState,
-                        transactionProps: {},
-                        transactPopup: false,
-                        consuming: null,
-                    }))
-                }
-            );
-            this.web3.eth.getGasPrice().then(
-                (result) => {
-                    this.setState(oldState => ({
-                        ...oldState,
-                        transactionProps: {
-                            ...oldState.transactionProps,
-                            gasPrice: result.toString()
-                        },
-                        transactPopup: (oldState.transactionProps.balance && oldState.transactionProps.gas),
-                    }))
-                },
-                (error) => {
-                    this.notify("Error", "Could not get gas price from the blockchain, check the connection", "danger");
-                    console.log("could not get gas price for publishing");
-                    this.setState(oldState => ({
-                        ...oldState,
-                        transactionProps: {},
-                        transactPopup: false,
-                        consuming: null,
-                    }))
-                }
-            );
-            this.setState(oldState => ({
-                ...oldState,
-                /*transactionProps: {...oldState.transactionProps, gas: "8000000"},
-                transactPopup: (oldState.transactionProps.balance && oldState.transactionProps.gasPrice),*/
-                consuming: CMB
-            }));
+            this.setState(oldState => ({...oldState, consuming: CMB}));
         } else {
-            console.log("asking for address of content " + content.description);
             this.Catalog.methods.getContentAddress(this.web3.utils.asciiToHex(content.description)).call(
                 {from: this.props.account}
             ).then(
                 (result) => {
-                    console.log(`returned address ${result.toString()}`);
                     this.setState(oldState => ({
                         ...oldState,
                         boughtContent: oldState.boughtContent.map((v, i) =>
@@ -655,8 +504,13 @@ class UserApp extends React.Component {
         }
     };
 
+    /*
+    * Invoked when the user confirms the transaction (after reviewing it in an informative dialog), this function
+    * effectively asks the Content for consumption, also registering callbacks for the "Content Provider" and "Can
+    * Leave Feedback" solidity events.
+    */
     confirmConsume = () => {
-        this.state.consuming.once('ProvideContent', {filter: {user: this.props.account}},
+        this.state.consuming.once('ProvideContent', {filter: {user: this.props.account}, fromBlock: "latest"},
             (error, event) => {
                 if (error) console.log("provideContent error: " + error);
                 else {
@@ -665,12 +519,11 @@ class UserApp extends React.Component {
                     const bought = this.state.boughtContent
                         .filter(content => content.description !== contentName)
                         .map((item, idx) => ({...item, index: idx}));
-                    console.log(bought);
                     this.setState(oldState => ({...oldState, boughtContent: bought}));
                 }
             }
         );
-        this.state.consuming.once('CanLeaveFeedback', {filter: {user: this.props.account}},
+        this.state.consuming.once('CanLeaveFeedback', {filter: {user: this.props.account}, fromBlock: "latest"},
             (error, event) => {
                 if (error) console.log("canLeaveFeedback error: " + error);
                 else  {
@@ -691,7 +544,6 @@ class UserApp extends React.Component {
             gasPrice: this.state.transactionProps.gasPrice,
         }).then(
             (result) => {
-                console.log(result);
                 this.setState(o => ({...o, loading: false}));
                 this.notify("Success!", "Request for access sent", "success");
             },
@@ -704,42 +556,26 @@ class UserApp extends React.Component {
         this.setState(oldState => ({...oldState, loading: true, consuming: null, transactionProps: {}, transactPopup: false}));
     };
 
+    // Starts the purchase or renewal of a Premium subscription, estimating the gas cost of the operation.
     buyPremium = (price, acc) => () => {
-        console.log("buypremium");
         const method = (acc) ? this.Catalog.methods.giftPremium(acc) : this.Catalog.methods.buyPremium();
-        method.estimateGas({from: this.props.account, value: price}).then(
-            (result) => this.setState(o => ({...o,
-                transactionProps: {...o.transactionProps, gas: result.toString()},
-                transactPopup: o.transactionProps.gasPrice && o.transactionProps.balance,
-            })),
+        getTransactionParameters(this.web3, method, this.props.account, {value: price}).then(
+            (result) => this.setState(o => ({...o, transactionProps: {price, ...result}, transactPopup: true})),
             (error) => {
-                this.notify("Error", "Could not estimate gas for purchasing subscriptions", "danger");
-                this.setState(o => ({...o, transactionProps: {}, transactPopup: false, giftingPremium: false, premiumMethod: null}))
+                console.log("Error in getting parameters for buyPremium");
+                console.log(error);
+                this.notify("Error", `Could not complete operation (error in ${error.type})`, "danger");
+                this.setState(o => ({...o, giftingPremium: false, premiumMethod: null}));
             }
         );
-        this.web3.eth.getBalance(this.props.account).then(
-            (result) => this.setState(o => ({...o,
-                transactionProps: {...o.transactionProps, balance: result.toString()},
-                transactPopup: o.transactionProps.gasPrice && o.transactionProps.gas,
-            })),
-            (error) => {
-                this.notify("Error", "Could not get balance for the current account, check the connection", "danger");
-                this.setState(o => ({...o, transactionProps: {}, transactPopup: false, giftingPremium: false, premiumMethod: null}))
-            }
-        );
-        this.web3.eth.getGasPrice().then(
-            (result) => this.setState(o => ({...o,
-                transactionProps: {...o.transactionProps, gasPrice: result.toString()},
-                transactPopup: o.transactionProps.gas && o.transactionProps.balance,
-            })),
-            (error) => {
-                this.notify("Error", "Could not get gas price from the blockchain, check the connection", "danger");
-                this.setState(o => ({...o, transactionProps: {}, transactPopup: false, giftingPremium: false, premiumMethod: null}))
-            }
-        );
-        this.setState(o => ({...o, transactionProps: {price: price}, buyingPremium: false, premiumMethod: method}));
+        this.setState(o => ({...o, buyingPremium: false, premiumMethod: method}));
     };
 
+    /*
+    * Invoked when the user confirms the transaction (after reviewing it in an informative dialog), this function
+    * effectively purchases or renews a Premium subscription (either for the user or gifted to another user) from the
+    * Catalog.
+    */
     confirmPremium = () => {
         this.state.premiumMethod.send({
             from: this.props.account,
@@ -768,6 +604,15 @@ class UserApp extends React.Component {
         this.setState(o => ({...o, transactionProps: {}, transactPopup: false, loading: true}));
     };
 
+    /*
+     * This is a React state function that will be called only once, after the component is mounted in the virtual
+     * DOM but before it gets rendered.
+     *
+     * First, this function populates the content list. Then it registers some callbacks for Solidity events
+     * fired when there's a new content available, when the Catalog grants access to a Content, and when a(n extension
+     * to the) Premium subscription is made available for the user. Finally, it registers a repeating function that
+     * checks if the user is still a Premium subscriber every 20 seconds.
+     */
     componentDidMount() {
         this.updateContentList();
         this.Catalog.events.NewContentAvailable({fromBlock: "latest"}).on('data', (event) => {
@@ -785,10 +630,9 @@ class UserApp extends React.Component {
             this.setState(oldState => ({...oldState, contentList: list, filteredList: list}));
         }).on('error', console.log);
         this.Catalog.events.GrantedAccess({filter: {user: this.props.account}, fromBlock: "latest"})
-            .on('error', error => console.log("GrantedAccess: " + error))
+            .on('error', error => console.log("Error in GrantedAccess: " + error))
             .on('data', event => {
                 const { boughtContent, contentList } = this.state;
-                console.log(event);
                 const description = this.web3.utils.hexToAscii(event.returnValues.description);
                 this.notify("Access!", `Obtained access to "${description}"!`, "success", 10000);
                 const refresh = [...boughtContent, {
@@ -796,21 +640,17 @@ class UserApp extends React.Component {
                     index: boughtContent.length,
                     address: event.returnValues.requested
                 }];
-                console.log(contentList);
                 const newList = contentList.map((item) =>
                     (item.description === description) ?
                         {...item, address: event.returnValues.requested} :
                         item
                 );
-                console.log("Granted Access modified contentList");
-                console.log(newList);
                 this.setState(oldState => ({...oldState, contentList: newList, boughtContent: refresh}));
             });
         this.Catalog.events.GotPremium({filter: {user: this.props.account}, fromBlock: "latest"})
             .on('error', error => console.log("GotPremium: " + error))
             .on('data', event => {
                 console.log(event);
-                console.log("user equals this account? " + (event.returnValues.user === this.props.account));
                 this.notify("Premium!", `Obtained or extended a Premium subscription!`, "success", 10000);
                 this.setState(oldState => ({...oldState, premiumFetching: false, isPremium: true}));
             });
@@ -818,7 +658,6 @@ class UserApp extends React.Component {
             this.setState(oldState => ({...oldState, premiumFetching: true}));
             this.Catalog.methods.isPremium(this.props.account).call({from: this.props.account}).then(
                 (result) => {
-                    console.log("isPremium result: " + result);
                     this.setState(oldState => ({...oldState, premiumFetching: false, isPremium: result}));
                 },
                 (error) => {
@@ -831,6 +670,7 @@ class UserApp extends React.Component {
         premiumfun();
     }
 
+    // Unregisters the "check for premium status" function.
     componentWillUnmount() {
         if (this.premiumUpdates) window.clearInterval(this.premiumUpdates);
     }
@@ -911,7 +751,6 @@ class UserApp extends React.Component {
                                         <ContentList
                                             attributes={attributes}
                                             action={(i) => () => {
-                                                console.log(contentList);
                                                 this.otherState.contentBuying = i;
                                                 this.setState(oldState => ({...oldState, buyingPrice: contentList[i].price}));
                                             }}
@@ -1029,13 +868,8 @@ class UserApp extends React.Component {
                     })()}
                     {feedbackOpen ?
                         <FeedbackForm
-                            cancel={() => {console.log('de'); this.setState(o => ({...o, transactionProps: {}, feedbackOpen: false, feedbackLeaving: null}))}}
-                            confirm={(feedback) => () => { console.log('de1');
-                                this.setState(o => ({
-                                    ...o,
-                                    feedback: feedback,
-                                    transactPopup: (o.transactionProps.gasPrice && o.transactionProps.gas && o.transactionProps.balance)
-                                }))}}
+                            cancel={ () =>  this.setState(o => ({...o, transactionProps: {}, feedback: null, feedbackOpen: false, feedbackLeaving: null})) }
+                            confirm={this.feedbackFormSubmitted}
                         /> : null
                     }
                     {buyingPrice ?
@@ -1051,7 +885,6 @@ class UserApp extends React.Component {
                         confirm={this.buyPremium}
                         gifting={giftingPremium}
                         cancel={(error) => () => {
-                            console.log("huehue");
                             this.setState(o => ({...o, buyingPremium: false, giftingPremium: false}));
                             error && this.notify("Error", "Could not fetch Premium subscription price from Catalog", "danger");
                         }}

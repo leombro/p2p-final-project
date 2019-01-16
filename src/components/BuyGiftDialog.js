@@ -1,3 +1,17 @@
+/*
+ *
+ *  University di Pisa - Master's Degree in Computer Science and Networking
+ *
+ *  Final Project for the course of Peer to Peer Systems and Blockchains
+ *
+ *  Teacher: Prof. Laura Ricci
+ *
+ *  Candidate: Orlando Leombruni, matricola 475727
+ *
+ *  File: BuyGiftDialog.js
+ *
+ */
+
 import React from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -17,6 +31,12 @@ import {
 import {prettifyWei} from "../Utils";
 import {BuyGiftDialogStyle as styles} from "../styles/MaterialCustomStyles";
 
+/*
+ * BuyGiftDialog Class
+ *
+ * A React Component that displays a dialog window, reviewing the purchase of a Content and asking the user
+ * if they want to buy it for themselves or gift it to another user.
+ */
 class BuyGiftDialog extends React.Component {
 
     state = {

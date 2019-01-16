@@ -1,3 +1,17 @@
+/*
+ *
+ *  University di Pisa - Master's Degree in Computer Science and Networking
+ *
+ *  Final Project for the course of Peer to Peer Systems and Blockchains
+ *
+ *  Teacher: Prof. Laura Ricci
+ *
+ *  Candidate: Orlando Leombruni, matricola 475727
+ *
+ *  File: FeedbackForm.js
+ *
+ */
+
 import React from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -13,6 +27,11 @@ import {
 } from '@material-ui/core';
 import { FeedbackFormStyle as styles } from "../styles/MaterialCustomStyles";
 
+/*
+ * FeedbackForm Class
+ *
+ * A React Component that allows the user to input feedback (as three numerical grades) for the Content.
+ */
 class FeedbackForm extends React.Component {
     state = {
         appreciation: -1,
@@ -20,6 +39,7 @@ class FeedbackForm extends React.Component {
         suggest: -1
     };
 
+    // Handles changes in the form.
     changeFields = event => {
         const { target } = event;
         this.setState(oldState => ({...oldState, [target.name]: target.value}))

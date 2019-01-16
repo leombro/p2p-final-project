@@ -1,7 +1,23 @@
+/*
+ *
+ *  University di Pisa - Master's Degree in Computer Science and Networking
+ *
+ *  Final Project for the course of Peer to Peer Systems and Blockchains
+ *
+ *  Teacher: Prof. Laura Ricci
+ *
+ *  Candidate: Orlando Leombruni, matricola 475727
+ *
+ *  File: Utils.js
+ *
+ *  Collection of utility functions, used throughout the webapp.
+ */
+
 import BN from 'bn.js';
 import Typography from "@material-ui/core/Typography/Typography";
 import React from "react";
 
+// Given a numerical amount of wei (e.g. 5003000000000000000) returns a human-readable string (e.g. "5.003 ether").
 export const prettifyWei = wei => {
     const weiBN = new BN(wei);
     const mweiBN = weiBN.divn(1000000);
@@ -14,11 +30,17 @@ export const prettifyWei = wei => {
     } else return weiBN.toString() + " wei";
 };
 
+// Bundles together text and style for app bar titles.
 export const makeTitle = (title, className) =>
     <Typography key={"title"} variant="h6" color="inherit" className={className} noWrap>
         {title}
     </Typography>;
 
+/*
+ * Given a Solidity method (accessed through a Web3 instance), its parameters and the EOA from which the operation
+ * must be performed, asks the blockchain for a gas estimate, current average gas cost and EOA balance, then delivers
+ * it to the asking function with a Promise.
+ */
 export const getTransactionParameters = (web3, method, account, otherParams) =>
     new Promise((resolve, reject) => {
         let gas = null, balance = null, gasPrice = null;

@@ -1,3 +1,17 @@
+/*
+ *
+ *  University di Pisa - Master's Degree in Computer Science and Networking
+ *
+ *  Final Project for the course of Peer to Peer Systems and Blockchains
+ *
+ *  Teacher: Prof. Laura Ricci
+ *
+ *  Candidate: Orlando Leombruni, matricola 475727
+ *
+ *  File: NewContentForm.js
+ *
+*/
+
 import React from 'react';
 import PropTypes from 'prop-types';
 import BN from 'bn.js';
@@ -13,6 +27,11 @@ import {
 } from '@material-ui/core';
 import { NewContentFormStyle as styles } from "../styles/MaterialCustomStyles";
 
+/*
+ * NewContentForm Class
+ *
+ * A React Component that provides the user with a form for creating a new managed Content.
+ */
 class NewContentForm extends React.Component {
 
     constructor(props) {
@@ -35,15 +54,15 @@ class NewContentForm extends React.Component {
         };
     }
 
-
+    // Handles user changes in the form.
     handleChange = event => {
         const { target } = event;
         this.setState(oldState => ({...oldState, [target.name]: target.value}))
     };
 
+    // Validates the form if all input is correct.
     checkForm = () => {
         const { name, genre, author, price, currency } = this.state;
-        console.log(typeof price);
         if (name && genre && author && (+price > 0) && currency)
             this.props.submitForm(name, genre, author, new BN(currency).muln(+price))
     };
@@ -131,7 +150,6 @@ class NewContentForm extends React.Component {
                 <CardActions style={{display: "block", width: "100%"}}>
                     <div className={classes.wrapper}>
                     <Button
-                        //size={"small"}
                         variant={"contained"}
                         className={classes.button}
                         color={"secondary"}

@@ -1,3 +1,19 @@
+/*
+ *
+ *  University di Pisa - Master's Degree in Computer Science and Networking
+ *
+ *  Final Project for the course of Peer to Peer Systems and Blockchains
+ *
+ *  Teacher: Prof. Laura Ricci
+ *
+ *  Candidate: Orlando Leombruni, matricola 475727
+ *
+ *  File: global.css
+ *
+ *  Style applied globally to the entire webapp.
+ *
+ */
+
 html, body, #root {
     width: 100%;
     height: 100%;

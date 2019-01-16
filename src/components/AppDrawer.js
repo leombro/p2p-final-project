@@ -1,3 +1,17 @@
+/*
+ *
+ *  University di Pisa - Master's Degree in Computer Science and Networking
+ *
+ *  Final Project for the course of Peer to Peer Systems and Blockchains
+ *
+ *  Teacher: Prof. Laura Ricci
+ *
+ *  Candidate: Orlando Leombruni, matricola 475727
+ *
+ *  File: AppDrawer.js
+ *
+ */
+
 import React from 'react';
 import PropTypes from 'prop-types';
 import classNames from 'classnames';
@@ -18,15 +32,23 @@ import {
 import secondaryLogo from '../assets/logo2.png';
 import { AppDrawerStyle as styles } from "../styles/MaterialCustomStyles";
 
+/*
+ * AppDrawer Class
+ *
+ * A React Component that provides a title bar and (optionally) a drawer menu to a page Component.
+ */
+
 class AppDrawer extends React.Component {
     state = {
         open: false,
     };
 
+    /*
+     * Manage the opening and closing of the drawer. Functions used as callbacks for the onClick properties of buttons.
+     */
     handleDrawerOpen = () => {
         this.setState({ open: true });
     };
-
     handleDrawerClose = () => {
         this.setState({ open: false });
     };

@@ -1,3 +1,17 @@
+/*
+ *
+ *  University di Pisa - Master's Degree in Computer Science and Networking
+ *
+ *  Final Project for the course of Peer to Peer Systems and Blockchains
+ *
+ *  Teacher: Prof. Laura Ricci
+ *
+ *  Candidate: Orlando Leombruni, matricola 475727
+ *
+ *  File: Web3LoginForm.js
+ *
+ */
+
 import React from 'react';
 import { withStyles } from '@material-ui/core/styles';
 import PropTypes from 'prop-types';
@@ -20,6 +34,12 @@ import { Visibility,
 import mainLogo from '../assets/logo.png';
 import { Web3LoginFormStyle as styles } from "../styles/MaterialCustomStyles";
 
+/*
+ * Web3LoginForm Class
+ *
+ * A React Component that queries the Web3 instance for the list of available EOAs and allows the user to unlock one
+ * of them in order to be used as the main account for performing operations on the blockchain.
+ */
 class Web3LoginForm extends React.Component {
 
     constructor(props) {
@@ -33,21 +53,34 @@ class Web3LoginForm extends React.Component {
             bottomText: "",
             showPassword: false,
         };
-        this.showAccounts = this.showAccounts.bind(this);
-        this.unlockCallback = this.unlockCallback.bind(this);
-        this.errorCallback = this.errorCallback.bind(this);
-        this.submit = this.submit.bind(this);
-        this.handleShowPassword = this.handleShowPassword.bind(this);
-        this.changedForm = this.changedForm.bind(this);
     }
 
+    /*
+     * This is a React state function that will be called only once, after the component is mounted in the virtual
+     * DOM but before it gets rendered.
+     *
+     * In particular, this function asks the underlying Web3 instance for the list of available EOAs.
+     */
     componentDidMount() {
-        const { web3 } = this.props;
-        web3.eth.getAccounts().then(this.showAccounts);
+        const { web3, noLogin, onUnlock } = this.props;
+        if (noLogin) {
+            web3.eth.getAccounts().then(
+                (list) => {
+                    if (list.length > 0) onUnlock(list[0]);
+                    else onUnlock("error");
+                },
+                (err) => console.log(err)
+            );
+        } else {
+            web3.eth.getAccounts().then(this.showAccounts, (err) => console.log(err));
+        }
     }
 
-    showAccounts(accounts) {
-        if (accounts) {
+    /*
+     * Populates the list data structure containing the available EOAs.
+     */
+    showAccounts = accounts => {
+        if (accounts && accounts.length > 0) {
             const accountList = accounts.map((account, index) => ({
                     label: `Account #${index+1} (${account.replace(account.slice(5, -3), "...")})`,
                     value: account,
@@ -57,18 +90,14 @@ class Web3LoginForm extends React.Component {
         } else {
             this.setState(oldState => ({...oldState, accounts: [{label: "No accounts found", value: null}]}));
         }
-    }
+    };
 
-    unlockCallback = account => () =>
-        this.props.onUnlock(account);
-
-
-    errorCallback() {
-        this.setState(oldState => ({...oldState, bottomText: "Wrong username and/or password"}));
-    }
-
-    submit(e) {
-        e.preventDefault();
+    /*
+     * Submits the form; asks the Web3 instance to unlock the selected account, then reports back to the
+     * enclosing component.
+     */
+    submit = event => {
+        event.preventDefault();
         const { account, password } = this.state;
         if (!account || !password) return;
         const { web3 } = this.props;
@@ -83,16 +112,18 @@ class Web3LoginForm extends React.Component {
             }
         );
         this.setState(oldState => ({...oldState, loading: true}));
-    }
+    };
 
-    handleShowPassword() {
+    // Handles the show/hide password button.
+    handleShowPassword = () => {
         this.setState(oldState => ({...oldState, showPassword: !oldState.showPassword}));
-    }
+    };
 
-    changedForm(event) {
+    // Handles changes made in the form.
+    changedForm = event => {
         const { target } = event;
         this.setState(oldState => ({...oldState, [target.name]: target.value}));
-    }
+    };
 
     render() {
         const { classes } = this.props;
@@ -127,11 +158,7 @@ class Web3LoginForm extends React.Component {
                                     className={classes.textField}
                                     value={account}
                                     onChange={this.changedForm}
-                                    SelectProps={{
-                                        MenuProps: {
-                                            className: classes.menu,
-                                        },
-                                    }}
+                                    SelectProps={{MenuProps: {className: classes.menu}}}
                                     margin="normal" >
                                     {accounts.map(option => (
                                         <MenuItem key={option.value} value={option.value}>
@@ -151,8 +178,7 @@ class Web3LoginForm extends React.Component {
                                         <InputAdornment position="end">
                                             <IconButton
                                                 aria-label="Toggle password visibility"
-                                                onClick={this.handleShowPassword}
-                                            >
+                                                onClick={this.handleShowPassword} >
                                                 {showPassword ? <Visibility/> : <VisibilityOff/>}
                                             </IconButton>
                                         </InputAdornment>
@@ -197,6 +223,7 @@ class Web3LoginForm extends React.Component {
 
 
 Web3LoginForm.propTypes = {
+    noLogin: PropTypes.bool.isRequired,
     web3: PropTypes.object.isRequired,
     onUnlock: PropTypes.func.isRequired,
 };

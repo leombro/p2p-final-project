@@ -1,14 +1,30 @@
+/*
+ *
+ *  University di Pisa - Master's Degree in Computer Science and Networking
+ *
+ *  Final Project for the course of Peer to Peer Systems and Blockchains
+ *
+ *  Teacher: Prof. Laura Ricci
+ *
+ *  Candidate: Orlando Leombruni, matricola 475727
+ *
+ *  File: LoginPage.js
+ *
+ */
+
 import React from 'react';
 import PropTypes from 'prop-types';
-import { withStyles } from '@material-ui/core/styles';
-import Dialog from '@material-ui/core/Dialog';
-import DialogTitle from '@material-ui/core/DialogTitle';
-import DialogContent from '@material-ui/core/DialogContent';
-import DialogContentText from '@material-ui/core/DialogContentText';
-import DialogActions from '@material-ui/core/DialogActions';
-import TextField from '@material-ui/core/TextField';
-import Slide from '@material-ui/core/Slide';
-import Button from '@material-ui/core/Button';
+import {
+    withStyles,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogContentText,
+    DialogActions,
+    TextField,
+    Slide,
+    Button,
+} from '@material-ui/core';
 import '../styles/login.css'
 import Web3LoginForm from "./Web3LoginForm";
 import json from '../solidity/compiled.json';
@@ -16,9 +32,17 @@ import AppDrawer from './AppDrawer'
 import {makeTitle} from "../Utils";
 import { LoginPageStyle as styles } from "../styles/MaterialCustomStyles";
 
+/*
+ * "Slide up" transition for the animation of a React component.
+ */
 const Transition = (props) =>
     <Slide direction="up" {...props} />;
 
+/*
+ * LoginPage Class
+ *
+ * A React Component that shows a login form to the user, allowing them also to select a Catalog contract to connect to.
+ */
 class LoginPage extends React.Component {
 
     constructor(props) {
@@ -32,9 +56,17 @@ class LoginPage extends React.Component {
         this.props.manageCenter(true);
     }
 
-    unlockCallback = account =>
-        this.setState(oldState => ({...oldState, loggedAccount: account, logged: true}));
+    // Changes this component's state when the Web3 instance unlocks the selected EOA.
+    unlockCallback = account => {
+            if (account === "error") this.props.onSubmit("error", "error", "error");
+            else this.setState(oldState => ({...oldState, loggedAccount: account, logged: true}))
+        };
 
+    /*
+     * After the desired EOA is unlocked by the Web3 instance and a Catalog account is chosen, this function checks that
+     * latter is a valid Catalog and then "reports" to the enclosing component the user EOA, the Catalog account and
+     * which app has been selected (Creator or User).
+     */
     report = appType => () => {
         this.setState(oldState => ({...oldState, error: false}));
         let error = (this.state.catalogAccount === "");
@@ -50,7 +82,6 @@ class LoginPage extends React.Component {
             Catalog.methods.isActiveCatalog().call({from: this.state.loggedAccount})
                 .then(
                     (result) => {
-                        console.log(result);
                         this.props.onSubmit(this.state.loggedAccount, this.state.catalogAccount, appType)
                     },
                     (error) => {
@@ -63,13 +94,14 @@ class LoginPage extends React.Component {
         }
     };
 
+    // Handles user changes in the form.
     handleChange = event => {
         const { target } = event;
         this.setState(oldState => ({...oldState, catalogAccount: target.value}));
     };
 
     render() {
-        const { web3, classes } = this.props;
+        const { web3, classes, noLogin } = this.props;
         const { logged, catalogAccount, error } = this.state;
 
         return (
@@ -108,13 +140,14 @@ class LoginPage extends React.Component {
                         </Button>
                     </DialogActions>
                 </Dialog> :
-                <Web3LoginForm onUnlock={this.unlockCallback} web3={ web3 }/>}
+                <Web3LoginForm noLogin={noLogin} onUnlock={this.unlockCallback} web3={ web3 }/>}
             </AppDrawer>
         );
     }
 }
 
 LoginPage.propTypes = {
+    noLogin: PropTypes.bool.isRequired,
     web3: PropTypes.object.isRequired,
     classes: PropTypes.object.isRequired,
     onSubmit: PropTypes.func.isRequired,

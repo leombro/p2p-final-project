@@ -1,3 +1,16 @@
+/*
+ *
+ *  University di Pisa - Master's Degree in Computer Science and Networking
+ *
+ *  Final Project for the course of Peer to Peer Systems and Blockchains
+ *
+ *  Teacher: Prof. Laura Ricci
+ *
+ *  Candidate: Orlando Leombruni, matricola 475727
+ *
+ *  File: ContentList.js
+ *
+ */
 import React from 'react';
 import PropTypes from 'prop-types';
 import CopyToClipboard from 'react-copy-to-clipboard';
@@ -11,11 +24,15 @@ import {
     Button,
     Tooltip
 } from '@material-ui/core';
-import {
-    ExpandMore
-} from '@material-ui/icons';
+import { ExpandMore } from '@material-ui/icons';
 import { ContentListStyle as styles } from "../styles/MaterialCustomStyles";
 
+/*
+ * CopyWrapper Class
+ *
+ * A React Component that wraps another component and makes it clickable; when clicked, the component's text
+ * gets copied into the clipboard
+ */
 const CopyWrapper = ({condition, placement, what, onCopy, children}) => (
     condition ?
         <Tooltip title={"Click to copy"} placement={placement}>
@@ -27,6 +44,13 @@ const CopyWrapper = ({condition, placement, what, onCopy, children}) => (
             {children}
         </div>
 );
+
+/*
+ * ContentList Class
+ *
+ * A React Component that displays a list where each item has several (displayable) attributes.
+ * The component is completely generic and can be used in a multitude of ways.
+ */
 
 class ContentList extends React.Component {
 
@@ -41,13 +65,16 @@ class ContentList extends React.Component {
         smallerBox: false,
     };
 
+    /*
+     * Function that handles the resizing of the browser window.
+     */
     handleResize() {
-        console.log(this.divRef);
         if (this.divRef) {
             this.setState({smallerBox: (this.divRef.getBoundingClientRect().width < 531)});
         }
     }
 
+    // React lifecycle methods to add/remove a 'resize' event listener when the component gets mounted/unmounted.
     componentDidMount() {
         this.handleResize();
         window.addEventListener('resize', this.handleResize);

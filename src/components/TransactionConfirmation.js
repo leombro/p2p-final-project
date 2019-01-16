@@ -1,8 +1,22 @@
+/*
+ *
+ *  University di Pisa - Master's Degree in Computer Science and Networking
+ *
+ *  Final Project for the course of Peer to Peer Systems and Blockchains
+ *
+ *  Teacher: Prof. Laura Ricci
+ *
+ *  Candidate: Orlando Leombruni, matricola 475727
+ *
+ *  File: TransactionConfirmation.js
+ *
+ */
+
 import React from 'react';
 import PropTypes from 'prop-types';
 import BN from 'bn.js';
-import { withStyles } from '@material-ui/core/styles';
 import {
+    withStyles,
     Dialog,
     DialogTitle,
     DialogContent,
@@ -13,8 +27,14 @@ import {
 import { prettifyWei } from "../Utils";
 import { TransactionConfirmationStyle as styles } from "../styles/MaterialCustomStyles";
 
+/*
+ * TransactionConfirmation Class
+ *
+ * A React Component that shows to the user a dialog window that contains information about the transaction
+ * they're going to perform: estimated gas cost, estimated transaction cost and current account balance.
+ * The user can then choose to perform or decline the transaction.
+ */
 class TransactionConfirmation extends React.Component {
-
 
     render() {
         const { classes, gas, gasPrice, balance, ok, cancel } = this.props;

@@ -1,3 +1,19 @@
+/*
+ *
+ *  University di Pisa - Master's Degree in Computer Science and Networking
+ *
+ *  Final Project for the course of Peer to Peer Systems and Blockchains
+ *
+ *  Teacher: Prof. Laura Ricci
+ *
+ *  Candidate: Orlando Leombruni, matricola 475727
+ *
+ *  File: MaterialCustomStyles.js
+ *
+ *  Contains all the custom styles for each React Component, using the Material UI framework.
+ *
+ */
+
 import {blue, green, red} from "@material-ui/core/colors";
 import {fade} from "@material-ui/core/styles/colorManipulator";
 

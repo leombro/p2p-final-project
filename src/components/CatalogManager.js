@@ -1,3 +1,17 @@
+/*
+ *
+ *  University di Pisa - Master's Degree in Computer Science and Networking
+ *
+ *  Final Project for the course of Peer to Peer Systems and Blockchains
+ *
+ *  Teacher: Prof. Laura Ricci
+ *
+ *  Candidate: Orlando Leombruni, matricola 475727
+ *
+ *  File: CatalogManager.js
+ *
+*/
+
 import React from 'react';
 import classNames from 'classnames';
 import { withStyles } from '@material-ui/core/styles';
@@ -10,26 +24,31 @@ import { Typography,
          DialogContent,
          DialogActions,
          DialogTitle } from '@material-ui/core';
-import { LibraryAdd,
-         Delete } from '@material-ui/icons';
+import { LibraryAdd, Delete } from '@material-ui/icons';
 import Web3LoginForm from "./Web3LoginForm";
 import json from '../solidity/compiled.json';
 import TransactionConfirmation from "./TransactionConfirmation";
 import AppDrawer from './AppDrawer'
-import {makeTitle} from "../Utils";
+import {getTransactionParameters, makeTitle} from "../Utils";
 import { CatalogManagerStyle as styles } from "../styles/MaterialCustomStyles";
 
+/*
+ * "Slide up" transition for the animation of a React component.
+ */
 const Transition = (props) =>
     <Slide direction="up" {...props} />;
 
+/*
+ * CatalogManager Class
+ *
+ * A React Component that provides a very simple interface for creating and deleting Catalog contracts.
+ */
 class CatalogManager extends React.Component {
 
     constructor(props) {
         super(props);
         this.state = {
-            logged: false,
             loggedAccount: null,
-            gasPrice: "",
             message: "",
             dialogOpen: false,
             catalogToClose: "",
@@ -37,77 +56,38 @@ class CatalogManager extends React.Component {
             confirm: false,
             confirmProps: {},
             isClose: false,
-            openingCatalog: "",
         };
         this.abi = JSON.parse(json.contracts["Catalog.sol:Catalog"].abi);
         this.bin = "0x" + json.contracts["Catalog.sol:Catalog"].bin;
         this.props.manageCenter(true);
-        this.props.web3.eth.getGasPrice().then((result, error) => {
-            if (error) {
-                console.log("Could not get gas price from blockchain, faling back to " +
-                    "default value of 20 gwei " + error);
-                const price = new this.props.web3.utils.BN(this.props.web3.utils.toWei(20, "gwei"));
-                this.setState(oldState => ({...oldState, gasPrice: price.toString()}));
-            }
-            else this.setState(oldState => ({...oldState, gasPrice: result.toString()}));
-            console.log('gasprice is ' + this.state.gasPrice);
-        });
     }
 
+    /*
+     * A callback function invoked when the user has chosen and unlocked an EOA from which to perform Catalog operations.
+     */
     unlockCallback = account => {
-        this.setState(oldState => ({...oldState, loggedAccount: account, logged: true}));
+        this.setState(oldState => ({...oldState, loggedAccount: account}));
         this.props.manageCenter(false);
     };
 
+    /*
+     * Begins the creation of a new Catalog contract, estimating the gas cost for the operation.
+     */
     createCatalog = () => {
         const { web3 } = this.props;
         const Catalog = new web3.eth.Contract(this.abi, {data: this.bin});
         const d = Catalog.deploy();
         this.setState(oldState => ({...oldState, isClose: false, dialogOpen: false, error: false}));
-        web3.eth.getBalance(this.state.loggedAccount).then(
-            (result) => {
-                console.log(result);
-                this.setState(oldState => ({
-                    ...oldState, confirmProps: {
-                        ...oldState.confirmProps,
-                        balance: result.toString(),
-                    },
-                    confirm: (oldState.confirmProps.gas && oldState.confirmProps.gasPrice),
-                }));
-                console.log("got balance of " + result.toString());
-            },
-            (error) => console.log("could not get balance for account")
-        );
-        d.estimateGas((err, result) => {
-            if (err) console.log('could not estimate gas');
-            else {
-                console.log(result);
-                this.setState(oldState => ({
-                    ...oldState, confirmProps: {
-                        ...oldState.confirmProps,
-                        gas: result.toString(),
-                    },
-                    confirm: (oldState.confirmProps.balance && oldState.confirmProps.gasPrice),
-                }));
-                console.log("got gas estimation of " + result.toString());
-            }
-        });
-        web3.eth.getGasPrice().then(
-            (result) => {
-                console.log(result);
-                this.setState(oldState => ({
-                    ...oldState, confirmProps: {
-                        ...oldState.confirmProps,
-                        gasPrice: result.toString(),
-                    },
-                    confirm: (oldState.confirmProps.gas && oldState.confirmProps.balance),
-                }));
-                console.log("got gas price of " + result.toString());
-            },
-                (error) => console.log("could not get gas price")
+        getTransactionParameters(web3, d, this.state.loggedAccount).then(
+            (result) => this.setState(o => ({...o, confirmProps: result, confirm: true})),
+            (error) => console.log(error)
         );
     };
 
+    /*
+     * Invoked when the user confirms the transaction (after reviewing it in an informative dialog), this function
+     * effectively deploys a new Catalog and then queries it to check if it's been correctly created.
+     */
     confirmCreate = () => {
         const {web3} = this.props;
         const Catalog = new web3.eth.Contract(this.abi, {data: this.bin});
@@ -117,7 +97,6 @@ class CatalogManager extends React.Component {
             gas: this.state.confirmProps.gas,
         }).then(
             (result) => {
-                console.log(result);
                 result.methods.isActiveCatalog().call({from: this.state.loggedAccount})
                     .then(
                         () => this.setState(oldState => ({...oldState,
@@ -132,16 +111,25 @@ class CatalogManager extends React.Component {
             }
         );
         this.setState(oldState => ({...oldState, message: "Creating catalog...", confirm: false, confirmProps: {}}));
-    }
+    };
 
+    /*
+     * Shows (or hides) the dialog window where the user can input the address of the Catalog to close.
+     */
     handleDialog = () =>
         this.setState(oldState => ({...oldState, dialogOpen: !oldState.dialogOpen}));
 
+    /*
+     * Handles the input of the address of the Catalog to close.
+     */
     handleChange = event => {
         const { target } = event;
         this.setState(oldState => ({...oldState, catalogToClose: target.value}));
     };
 
+    /*
+     * Begins the closing and deletion of a Catalog contract, estimating the gas cost of the operation.
+     */
     deleteCatalog = () => {
         let error = (this.state.catalogToClose === "");
         const { web3 } = this.props;
@@ -153,48 +141,22 @@ class CatalogManager extends React.Component {
             error = true;
             console.log(e);
         }
-        console.log(`error is ${error}`);
         if (!error) {
             this.setState(oldState => ({...oldState, isClose: true, dialogOpen: false, error: false}));
-            web3.eth.getBalance(this.state.loggedAccount).then(
-                (result) => this.setState(oldState => ({
-                    ...oldState, confirmProps: {
-                        ...oldState.confirmProps,
-                        balance: result.toString(),
-                    },
-                    confirm: (oldState.confirmProps.gas && oldState.confirmProps.gasPrice),
-                })),
-                (error) => console.log("could not get balance for account")
-            );
-            Catalog.methods.closeCatalog().estimateGas((err, result) => {
-                if (err) console.log('could not estimate gas');
-                else {
-                    this.setState(oldState => ({
-                        ...oldState, confirmProps: {
-                            ...oldState.confirmProps,
-                            gas: result.toString(),
-                        },
-                        confirm: (oldState.confirmProps.balance && oldState.confirmProps.gasPrice),
-                    }));
-                    console.log("got gas estimation of " + result.toString());
-                }
-            });
-            web3.eth.getGasPrice().then(
-                (result) => this.setState(oldState => ({
-                    ...oldState, confirmProps: {
-                        ...oldState.confirmProps,
-                        gasPrice: result.toString(),
-                    },
-                    confirm: (oldState.confirmProps.gas && oldState.confirmProps.balance),
-                })),
-                (error) => console.log("could not get gas price")
+            getTransactionParameters(web3, Catalog.methods.closeCatalog(), this.state.loggedAccount).then(
+                (result) => this.setState(o => ({...o, confirmProps: result, confirm: true})),
+                (error) => console.log(error)
             );
         } else {
             this.setState(oldState => ({...oldState, error}));
         }
     };
 
-    confirmClose = () => {
+    /*
+     * Invoked when the user confirms the transaction (after reviewing it in an informative dialog), this function
+     * checks that the Catalog is valid and active and then proceeds to close and delete it.
+     */
+    confirmDelete = () => {
         const {web3} = this.props;
         const abi = JSON.parse(json.contracts["Catalog.sol:Catalog"].abi);
         const Catalog = new web3.eth.Contract(abi, this.state.catalogToClose);
@@ -207,7 +169,6 @@ class CatalogManager extends React.Component {
                         gas: this.state.confirmProps.gas,
                     }).then(
                         (result) => {
-                            console.log(result);
                             Catalog.methods.isActiveCatalog().call({from: this.state.loggedAccount})
                                 .then(
                                     () => this.setState(oldState => ({...oldState,
@@ -228,12 +189,12 @@ class CatalogManager extends React.Component {
     };
 
     render() {
-        const {web3, classes} = this.props;
-        const {logged, message, dialogOpen, catalogToClose, error, confirm, confirmProps, isClose} = this.state;
+        const {web3, classes, noLogin} = this.props;
+        const { loggedAccount, message, dialogOpen, catalogToClose, error, confirm, confirmProps, isClose} = this.state;
 
         return (
             <AppDrawer drawer={false} loading={false} writeTitle={() => makeTitle("Catalog Management", classes.grow)} render={() => ""} >
-                {(logged) ?
+                {Boolean(loggedAccount) ?
                 <div>
                     <div className={classes.holder}>
                         <div className={classes.elements}>
@@ -259,7 +220,7 @@ class CatalogManager extends React.Component {
                         </div>
                     </div>
                     <div className={classes.holder}>
-                        <Typography variant={"body1"} color={"textPrimary"} className={classes.typography}>
+                        <Typography variant={"body1"} color={"textPrimary"} className={classes.typography} >
                             {message}
                         </Typography>
                     </div>
@@ -295,17 +256,18 @@ class CatalogManager extends React.Component {
                     {confirm ?
                         <TransactionConfirmation
                             {...confirmProps}
-                            ok={isClose? this.confirmClose : this.confirmCreate}
+                            ok={isClose? this.confirmDelete : this.confirmCreate}
                             cancel={() => this.setState(oldState => ({...oldState, confirm: false, confirmProps: {}}))} /> :
                         ""}
                 </div> :
-                <Web3LoginForm web3={web3} onUnlock={this.unlockCallback}/>}
+                <Web3LoginForm noLogin={noLogin} web3={web3} onUnlock={this.unlockCallback}/>}
             </AppDrawer>
         );
     }
 }
 
 CatalogManager.propTypes = {
+    noLogin: PropTypes.bool.isRequired,
     web3: PropTypes.object.isRequired,
     classes: PropTypes.object.isRequired,
     manageCenter: PropTypes.func.isRequired,
