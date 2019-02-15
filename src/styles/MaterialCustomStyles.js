@@ -206,6 +206,9 @@ export const ChartsStyle = theme => ({
     card: {
         padding: theme.spacing.unit * 2,
     },
+    button: {
+        margin: theme.spacing.unit,
+    },
 });
 
 export const ContentListStyle = theme => ({

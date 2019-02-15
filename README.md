@@ -13,7 +13,7 @@ University of Pisa for the *Master's Degree in Computer Science* and *Master's D
 Computer Science and Networking*. It is both a refinement and an extension to the endterm 
 project for the same course, which asked students to implement the *COBrA* portion of the
 system. Both assignment papers - the endterm and the final project ones - are provided under
-the `Assignment` directory.
+the `assignment` directory.
 
 
 ## Specifications

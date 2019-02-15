@@ -18,8 +18,10 @@ import {
     withStyles,
     Grid,
     Card,
+    Button,
     CardHeader,
     CardContent,
+    CardActions,
     Chip,
     Typography,
     Avatar,
@@ -453,6 +455,14 @@ class Charts extends React.Component {
                                 </Grid>
                             </Grid>
                         </CardContent>
+                        <CardActions style={{display: "block", width: "100%"}}>
+                            <Button
+                                className={classes.button}
+                                variant={"contained"}
+                                onClick={() => this.props.addSubAuthor(author.name)}>
+                                Notify about new content by {author.name}
+                            </Button>
+                        </CardActions>
                     </Card>
                 </Grid>
                 <Grid item xs={6}>
@@ -520,6 +530,14 @@ class Charts extends React.Component {
                                 </Grid>
                             </Grid>
                         </CardContent>
+                        <CardActions style={{display: "block", width: "100%"}}>
+                            <Button
+                                className={classes.button}
+                                variant={"contained"}
+                                onClick={() => this.props.addSubGenre(genre.name)}>
+                                Notify about new content of genre {genre.name}
+                            </Button>
+                        </CardActions>
                     </Card>
                 </Grid>
             </Grid>
@@ -531,6 +549,8 @@ Charts.propTypes = {
     classes: PropTypes.object.isRequired,
     authors: PropTypes.array.isRequired,
     genres: PropTypes.array.isRequired,
+    addSubAuthor: PropTypes.func.isRequired,
+    addSubGenre: PropTypes.func.isRequired,
     web3: PropTypes.object.isRequired,
     Catalog: PropTypes.object.isRequired,
     account: PropTypes.string.isRequired,

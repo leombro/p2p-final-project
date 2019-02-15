@@ -112,6 +112,8 @@ class UserApp extends React.Component {
     otherState = {
         contentBuying: -1,
         isPremiumTransaction: false,
+        authorSubs: [],
+        genreSubs: [],
     };
 
     // Displays a notification in the upper right portion of the screen.
@@ -604,6 +606,26 @@ class UserApp extends React.Component {
         this.setState(o => ({...o, transactionProps: {}, transactPopup: false, loading: true}));
     };
 
+    // Adds an author to the list of subscriptions for notifications
+    addSubAuthor = (author) => {
+        if (this.otherState.authorSubs.includes(author)) {
+            this.notify("Warning", `You was already subscribed to new content by ${author}`, "material");
+        } else {
+            this.otherState.authorSubs.push(author);
+            this.notify("Success!", `You've subscribed to new content by ${author}!`, "success");
+        }
+    };
+
+    // Adds a genre to the list of subscriptions for notifications
+    addSubGenre = (genre) => {
+        if (this.otherState.genreSubs.includes(genre)) {
+            this.notify("Warning", `You was already subscribed to new content with genre ${genre}`, "material");
+        } else {
+            this.otherState.genreSubs.push(genre);
+            this.notify("Success!", `You've subscribed to new content with genre ${genre}!`, "success");
+        }
+    };
+
     /*
      * This is a React state function that will be called only once, after the component is mounted in the virtual
      * DOM but before it gets rendered.
@@ -616,18 +638,28 @@ class UserApp extends React.Component {
     componentDidMount() {
         this.updateContentList();
         this.Catalog.events.NewContentAvailable({fromBlock: "latest"}).on('data', (event) => {
-            this.notify("New content!",
-                `Content ${this.web3.utils.hexToAscii(event.returnValues.descr)} has been published on the Catalog!`,
-                "material", 10000);
-            const list = [...this.state.contentList, {
-                index: this.state.contentList.length,
-                description: this.web3.utils.hexToAscii(event.returnValues.descr),
-                genre: this.web3.utils.hexToAscii(event.returnValues.genre),
-                author: this.web3.utils.hexToAscii(event.returnValues.author),
-                price: event.returnValues.price,
-                views: 0,
-            }];
-            this.setState(oldState => ({...oldState, contentList: list, filteredList: list}));
+            let show = false;
+            if (this.otherState.genreSubs.includes(this.web3.utils.hexToAscii(event.returnValues.genre))
+                || this.otherState.authorSubs.includes(this.web3.utils.hexToAscii(event.returnValues.author)))
+                show = true;
+            if (show) {
+                this.notify("New content!",
+                    `Content ${this.web3.utils.hexToAscii(event.returnValues.descr)} has been published on the Catalog!`,
+                    "material", 10000);
+            }
+            if (!this.state.contentList.some((content) =>
+                content.description === this.web3.utils.hexToAscii(event.returnValues.descr)
+            )) {
+                const list = [...this.state.contentList, {
+                    index: this.state.contentList.length,
+                    description: this.web3.utils.hexToAscii(event.returnValues.descr),
+                    genre: this.web3.utils.hexToAscii(event.returnValues.genre),
+                    author: this.web3.utils.hexToAscii(event.returnValues.author),
+                    price: event.returnValues.price,
+                    views: 0,
+                }];
+                this.setState(oldState => ({...oldState, contentList: list, filteredList: list}));
+            }
         }).on('error', console.log);
         this.Catalog.events.GrantedAccess({filter: {user: this.props.account}, fromBlock: "latest"})
             .on('error', error => console.log("Error in GrantedAccess: " + error))
@@ -856,7 +888,14 @@ class UserApp extends React.Component {
                                 );
                             case Panels.CHARTS:
                                 return(
-                                    <Charts authors={authorList} genres={genreList} web3={this.web3} Catalog={this.Catalog} account={this.props.account}/>
+                                    <Charts
+                                        authors={authorList}
+                                        genres={genreList}
+                                        web3={this.web3}
+                                        addSubAuthor={this.addSubAuthor}
+                                        addSubGenre={this.addSubGenre}
+                                        Catalog={this.Catalog}
+                                        account={this.props.account}/>
                                 );
                             default:
                                 return (
